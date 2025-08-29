@@ -214,6 +214,9 @@ services:
       context: ./engine-nest
       dockerfile: Dockerfile
       target: development
+      args:
+        PORT: 3001
+        GRPC_PORT: 50052
     container_name: n8n-ai-engine
     environment:
       NODE_ENV: development
@@ -294,7 +297,7 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.20.0.0/16
+        - subnet: 172.21.0.0/16
 
 volumes:
   postgres_data:
