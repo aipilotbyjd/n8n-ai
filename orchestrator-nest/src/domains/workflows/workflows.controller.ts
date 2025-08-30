@@ -30,6 +30,7 @@ import { UpdateWorkflowDto } from "./dto/update-workflow.dto";
 import { ListWorkflowsDto } from "./dto/list-workflows.dto";
 import { Workflow } from "./entities/workflow.entity";
 import { AuthUser } from "../auth/interfaces/auth-user.interface";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 
 
@@ -70,10 +71,8 @@ export class WorkflowsController {
   })
   async createWorkflow(
     @Body() createWorkflowDto: CreateWorkflowDto,
-  ): Promise<Workflow> {
-    // Extract user from JWTAuthGuard context
     @CurrentUser() user: AuthUser,
-
+  ): Promise<Workflow> {
     try {
       return await this.workflowsService.create(createWorkflowDto, user);
     } catch (error) {
@@ -127,15 +126,15 @@ export class WorkflowsController {
     status: HttpStatus.UNAUTHORIZED,
     description: "Authentication required",
   })
-  async listWorkflows(@Query() query: ListWorkflowsDto): Promise<{
+  async listWorkflows(
+    @Query() query: ListWorkflowsDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{
     data: Workflow[];
     total: number;
     page: number;
     limit: number;
   }> {
-    // Extract user from JWTAuthGuard context
-    @CurrentUser() user: AuthUser,
-
     const result = await this.workflowsService.findAll(query, user);
     return {
       data: result.items,
@@ -215,10 +214,8 @@ export class WorkflowsController {
   async updateWorkflow(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() updateWorkflowDto: UpdateWorkflowDto,
-  ): Promise<Workflow> {
-    // Extract user from JWTAuthGuard context
     @CurrentUser() user: AuthUser,
-
+  ): Promise<Workflow> {
     const workflow = await this.workflowsService.update(
       id,
       updateWorkflowDto,
@@ -258,18 +255,11 @@ export class WorkflowsController {
     status: HttpStatus.CONFLICT,
     description: "Cannot delete workflow with active executions",
   })
-  async deleteWorkflow(@Param("id", ParseUUIDPipe) id: string): Promise<void> {
-    // Extract user from JWTAuthGuard context
+  async deleteWorkflow(
+    @Param("id", ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthUser,
-
-    try {
-      await this.workflowsService.remove(id, user);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw new NotFoundException(`Workflow with ID ${id} not found`);
-      }
-      throw error;
-    }
+  ): Promise<void> {
+    return this.workflowsService.remove(id, user);
   }
 
   @Post(":id/activate")
@@ -331,10 +321,8 @@ export class WorkflowsController {
   })
   async deactivateWorkflow(
     @Param("id", ParseUUIDPipe) id: string,
-  ): Promise<Workflow> {
-    // Extract user from JWTAuthGuard context
     @CurrentUser() user: AuthUser,
-
+  ): Promise<Workflow> {
     const workflow = await this.workflowsService.deactivate(id, user);
     if (!workflow) {
       throw new NotFoundException(`Workflow with ID ${id} not found`);
@@ -378,9 +366,11 @@ export class WorkflowsController {
   async duplicateWorkflow(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() body: { name?: string },
+    @CurrentUser() user: AuthUser,
   ): Promise<Workflow> {
     const duplicatedWorkflow = await this.workflowsService.duplicate(
       id,
+      user,
       body.name,
     );
     return duplicatedWorkflow;
@@ -429,5 +419,23 @@ export class WorkflowsController {
   ): Promise<any> {
     @CurrentUser() user: AuthUser,
     return this.workflowsService.triggerExecution(id, user, body.inputData);
+  }
+}
+y: { inputData?: Record<string, any> },
+  ): Promise<any> {
+    @CurrentUser() user: AuthUser,
+    return this.workflowsService.triggerExecution(id, user, body.inputData);
+  }
+}
+);
+  }
+}
+);
+  }
+}
+user, body.inputData);
+  }
+}
+);
   }
 }
