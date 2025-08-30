@@ -8,13 +8,15 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const rabbitmqUri = configService.get<string>('rabbitmq.uri');
-  const executionsQueue = configService.get<string>('rabbitmq.queues.executions');
+  const nodeExecutionsQueue = configService.get<string>(
+    'rabbitmq.queues.nodeExecution',
+  );
 
   app.connectMicroservice({
     transport: Transport.RMQ,
     options: {
       urls: [rabbitmqUri],
-      queue: executionsQueue,
+      queue: nodeExecutionsQueue,
       queueOptions: {
         durable: false,
       },
@@ -22,6 +24,6 @@ async function bootstrap() {
   });
 
   await app.startAllMicroservices();
-  console.log('Engine service is running');
+  console.log('Node runner service is running');
 }
 bootstrap();

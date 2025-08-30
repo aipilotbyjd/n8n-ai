@@ -1,3 +1,4 @@
+import { ExecutionsService } from '../../executions/executions.service';
 import {
   Injectable,
   Logger,
@@ -40,6 +41,7 @@ export class WorkflowsService {
     private readonly tenantService: TenantService,
     private readonly metricsService: MetricsService,
     private readonly auditLogService: AuditLogService,
+    private readonly executionsService: ExecutionsService,
   ) {}
 
   async create(
@@ -478,6 +480,39 @@ export class WorkflowsService {
     this.logger.log(`Deactivated workflow ${id} for tenant ${user.tenantId}`);
 
     return deactivatedWorkflow;
+  }
+
+  async triggerExecution(
+    id: string,
+    user: AuthUser,
+    inputData?: Record<string, any>,
+  ): Promise<any> {
+    this.logger.debug(`Triggering execution for workflow ${id}`);
+
+    const workflow = await this.findOne(id, user);
+
+    if (workflow.status !== WorkflowStatus.ACTIVE) {
+      throw new BadRequestException("Workflow is not active and cannot be executed.");
+    }
+
+    // For now, we assume the workflow has a single trigger node
+    // In a real scenario, this would involve more complex logic to identify the trigger and its type
+    const triggerNode = workflow.nodes.find(node => node.type === 'trigger');
+
+    if (!triggerNode) {
+      throw new BadRequestException("Workflow does not have a trigger node.");
+    }
+
+    return this.executionsService.startExecution(
+      {
+        workflowId: workflow.id,
+        mode: 'manual', // Or 'webhook', 'schedule', etc. based on trigger type
+        inputData: inputData || {},
+        triggerData: {},
+      },
+      user.tenantId,
+      user.userId,
+    );
   }
 
   async getWorkflowStatistics(user: AuthUser): Promise<any> {

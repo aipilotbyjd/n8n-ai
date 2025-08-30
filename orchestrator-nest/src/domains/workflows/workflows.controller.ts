@@ -30,27 +30,14 @@ import { UpdateWorkflowDto } from "./dto/update-workflow.dto";
 import { ListWorkflowsDto } from "./dto/list-workflows.dto";
 import { Workflow } from "./entities/workflow.entity";
 import { AuthUser } from "../auth/interfaces/auth-user.interface";
+import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 
-// Create a mock user for demonstration purposes
-// Extract user from authentication context using JWTAuthGuard
-const createMockUser = (): AuthUser => ({
-  id: "default-user",
-  userId: "default-user",
-  email: "demo@example.com",
-  username: "demo-user",
-  firstName: "Demo",
-  lastName: "User",
-  tenantId: "default-tenant",
-  roles: ["user"],
-  permissions: ["read:workflows", "write:workflows"],
-  isActive: true,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-});
+
 
 @ApiTags("Workflows")
 @Controller({ path: "workflows", version: "1" })
 @ApiBearerAuth("JWT-auth")
+@UseGuards(JwtAuthGuard)
 export class WorkflowsController {
   constructor(private readonly workflowsService: WorkflowsService) {}
 
@@ -85,10 +72,10 @@ export class WorkflowsController {
     @Body() createWorkflowDto: CreateWorkflowDto,
   ): Promise<Workflow> {
     // Extract user from JWTAuthGuard context
-    const mockUser = createMockUser();
+    @CurrentUser() user: AuthUser,
 
     try {
-      return await this.workflowsService.create(createWorkflowDto, mockUser);
+      return await this.workflowsService.create(createWorkflowDto, user);
     } catch (error) {
       if (error.message.includes("already exists")) {
         throw new BadRequestException("Workflow with this name already exists");
@@ -147,9 +134,9 @@ export class WorkflowsController {
     limit: number;
   }> {
     // Extract user from JWTAuthGuard context
-    const mockUser = createMockUser();
+    @CurrentUser() user: AuthUser,
 
-    const result = await this.workflowsService.findAll(query, mockUser);
+    const result = await this.workflowsService.findAll(query, user);
     return {
       data: result.items,
       total: result.total,
@@ -184,9 +171,9 @@ export class WorkflowsController {
   })
   async getWorkflow(@Param("id", ParseUUIDPipe) id: string): Promise<Workflow> {
     // Extract user from JWTAuthGuard context
-    const mockUser = createMockUser();
+    @CurrentUser() user: AuthUser,
 
-    const workflow = await this.workflowsService.findOne(id, mockUser);
+    const workflow = await this.workflowsService.findOne(id, user);
     if (!workflow) {
       throw new NotFoundException(`Workflow with ID ${id} not found`);
     }
@@ -230,12 +217,12 @@ export class WorkflowsController {
     @Body() updateWorkflowDto: UpdateWorkflowDto,
   ): Promise<Workflow> {
     // Extract user from JWTAuthGuard context
-    const mockUser = createMockUser();
+    @CurrentUser() user: AuthUser,
 
     const workflow = await this.workflowsService.update(
       id,
       updateWorkflowDto,
-      mockUser,
+      user,
     );
     if (!workflow) {
       throw new NotFoundException(`Workflow with ID ${id} not found`);
@@ -273,10 +260,10 @@ export class WorkflowsController {
   })
   async deleteWorkflow(@Param("id", ParseUUIDPipe) id: string): Promise<void> {
     // Extract user from JWTAuthGuard context
-    const mockUser = createMockUser();
+    @CurrentUser() user: AuthUser,
 
     try {
-      await this.workflowsService.remove(id, mockUser);
+      await this.workflowsService.remove(id, user);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw new NotFoundException(`Workflow with ID ${id} not found`);
@@ -313,9 +300,9 @@ export class WorkflowsController {
     @Param("id", ParseUUIDPipe) id: string,
   ): Promise<Workflow> {
     // Extract user from JWTAuthGuard context
-    const mockUser = createMockUser();
+    @CurrentUser() user: AuthUser,
 
-    const workflow = await this.workflowsService.activate(id, mockUser);
+    const workflow = await this.workflowsService.activate(id, user);
     if (!workflow) {
       throw new NotFoundException(`Workflow with ID ${id} not found`);
     }
@@ -346,9 +333,9 @@ export class WorkflowsController {
     @Param("id", ParseUUIDPipe) id: string,
   ): Promise<Workflow> {
     // Extract user from JWTAuthGuard context
-    const mockUser = createMockUser();
+    @CurrentUser() user: AuthUser,
 
-    const workflow = await this.workflowsService.deactivate(id, mockUser);
+    const workflow = await this.workflowsService.deactivate(id, user);
     if (!workflow) {
       throw new NotFoundException(`Workflow with ID ${id} not found`);
     }
@@ -397,5 +384,50 @@ export class WorkflowsController {
       body.name,
     );
     return duplicatedWorkflow;
+  }
+
+  @Post(':id/execute')
+  @ApiOperation({
+    summary: 'Execute workflow',
+    description: 'Triggers an immediate execution of a workflow',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Workflow UUID to execute',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        inputData: {
+          type: 'object',
+          description: 'Optional input data for the workflow execution',
+          example: { key: 'value' },
+        },
+      },
+    },
+    required: false,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Workflow execution triggered successfully',
+    type: Workflow,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Workflow not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Workflow cannot be executed',
+  })
+  async executeWorkflow(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { inputData?: Record<string, any> },
+  ): Promise<any> {
+    @CurrentUser() user: AuthUser,
+    return this.workflowsService.triggerExecution(id, user, body.inputData);
   }
 }

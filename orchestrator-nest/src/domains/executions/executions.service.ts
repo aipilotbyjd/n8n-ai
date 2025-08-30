@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-} from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, BadRequestException, Logger } from "@nestjs/common";
+import { ClientProxy } from '@nestjs/microservices';
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, FindManyOptions, In, Between } from "typeorm";
 import { EventEmitter2 } from "@nestjs/event-emitter";
@@ -27,6 +23,7 @@ export class ExecutionsService {
     private readonly executionRepository: Repository<Execution>,
     private readonly eventEmitter: EventEmitter2,
     private readonly auditService: AuditLogService,
+    @Inject('EXECUTION_SERVICE') private readonly client: ClientProxy,
   ) {}
 
   async startExecution(
@@ -48,8 +45,8 @@ export class ExecutionsService {
 
     const savedExecution = await this.executionRepository.save(execution);
 
-    // Emit event to trigger execution
-    this.eventEmitter.emit("execution.started", {
+    // Emit event to trigger execution via RabbitMQ
+    this.client.emit('execution.started', {
       execution: savedExecution,
       tenantId,
       userId,

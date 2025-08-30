@@ -1,42 +1,7 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  Delete,
-  UseGuards,
-  Query,
-  HttpCode,
-  HttpStatus,
-  ParseBoolPipe,
-  DefaultValuePipe,
-  ParseIntPipe,
-} from "@nestjs/common";
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiParam,
-  ApiQuery,
-  ApiCreatedResponse,
-  ApiOkResponse,
-  ApiNoContentResponse,
-  ApiBadRequestResponse,
-  ApiNotFoundResponse,
-  ApiUnauthorizedResponse,
-} from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { TenantGuard } from "../../common/guards/tenant.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Tenant } from "../../common/decorators/tenant.decorator";
-import { ExecutionsService } from "./executions.service";
-import { StartExecutionDto } from "./dto/start-execution.dto";
-import { ExecutionResponseDto } from "./dto/execution-response.dto";
-import { ExecutionFilterDto } from "./dto/execution-filter.dto";
-import { RetryExecutionDto } from "./dto/retry-execution.dto";
-import { ExecutionStatus, ExecutionMode } from "./entities/execution.entity";
 
 @ApiTags("Executions")
 @Controller("executions")

@@ -1,6 +1,7 @@
+import { NodeExecutorService } from './services/node-executor.service';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { EngineModule } from './engine/engine.module';
+import { NodeExecutionConsumer } from './consumers/node-execution.consumer';
 import rabbitmqConfig from './config/rabbitmq.config';
 
 @Module({
@@ -8,9 +9,8 @@ import rabbitmqConfig from './config/rabbitmq.config';
     ConfigModule.forRoot({
       load: [rabbitmqConfig],
     }),
-    EngineModule,
   ],
-  controllers: [],
-  providers: [],
+  controllers: [NodeExecutionConsumer],
+  providers: [NodeExecutorService],
 })
 export class AppModule {}

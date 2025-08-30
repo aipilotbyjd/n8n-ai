@@ -25,64 +25,22 @@ import {
   ApiBody,
   ApiExcludeEndpoint,
 } from "@nestjs/swagger";
+import { AuthService } from "./auth.service";
 import { User, UserStatus } from "./entities/user.entity";
-
-// DTOs for authentication operations
-class LoginDto {
-  email: string;
-  password: string;
-  tenantId?: string;
-  rememberMe?: boolean;
-}
-
-class RegisterDto {
-  email: string;
-  password: string;
-  firstName?: string;
-  lastName?: string;
-  username?: string;
-  tenantId: string;
-  invitationCode?: string;
-}
-
-class RefreshTokenDto {
-  refreshToken: string;
-}
-
-class ForgotPasswordDto {
-  email: string;
-  tenantId?: string;
-}
-
-class ResetPasswordDto {
-  token: string;
-  newPassword: string;
-}
-
-class ChangePasswordDto {
-  currentPassword: string;
-  newPassword: string;
-}
-
-class UpdateProfileDto {
-  firstName?: string;
-  lastName?: string;
-  username?: string;
-  metadata?: Record<string, any>;
-}
-
-class AuthResponse {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-  tokenType: string = "Bearer";
-  user: Partial<User>;
-}
+import { LoginDto } from "./dto/login.dto";
+import { RegisterDto } from "./dto/register.dto";
+import { RefreshTokenDto } from "./dto/refresh-token.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { ChangePasswordDto } from "./dto/change-password.dto";
+import { UpdateProfileDto } from "./dto/update-profile.dto";
+import { AuthResponse } from "./dto/auth-response.dto";
 
 @ApiTags("Authentication")
 @Controller({ path: "auth", version: "1" })
 export class AuthController {
-  constructor() {} // private readonly authService: AuthService, // Note: AuthService would need to be created
+  export class AuthController {
+  constructor(private readonly authService: AuthService) {}
 
   @Post("login")
   @HttpCode(HttpStatus.OK)
@@ -93,17 +51,6 @@ export class AuthController {
   @ApiBody({
     type: LoginDto,
     description: "Login credentials",
-    examples: {
-      "email-login": {
-        summary: "Email and password login",
-        value: {
-          email: "user@example.com",
-          password: "secretPassword123",
-          tenantId: "tenant-uuid",
-          rememberMe: true,
-        },
-      },
-    },
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -119,8 +66,7 @@ export class AuthController {
     description: "Invalid request data",
   })
   async login(@Body() loginDto: LoginDto): Promise<AuthResponse> {
-    // Implementation would call authService.login()
-    throw new Error("Implementation pending");
+    return this.authService.login(loginDto);
   }
 
   @Post("register")
@@ -147,8 +93,7 @@ export class AuthController {
     description: "Invalid registration data",
   })
   async register(@Body() registerDto: RegisterDto): Promise<AuthResponse> {
-    // Implementation would call authService.register()
-    throw new Error("Implementation pending");
+    return this.authService.register(registerDto);
   }
 
   @Post("refresh")
@@ -173,13 +118,13 @@ export class AuthController {
   async refreshToken(
     @Body() refreshTokenDto: RefreshTokenDto,
   ): Promise<AuthResponse> {
-    // Implementation would call authService.refreshToken()
-    throw new Error("Implementation pending");
+    return this.authService.refreshToken(refreshTokenDto);
   }
 
   @Post("logout")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth("JWT-auth")
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: "User logout",
     description: "Invalidates the current access and refresh tokens",
@@ -193,8 +138,7 @@ export class AuthController {
     description: "Authentication required",
   })
   async logout(@Request() req: any): Promise<void> {
-    // Implementation would call authService.logout()
-    throw new Error("Implementation pending");
+    return this.authService.logout(req.user);
   }
 
   @Post("forgot-password")
@@ -224,8 +168,8 @@ export class AuthController {
   async forgotPassword(
     @Body() forgotPasswordDto: ForgotPasswordDto,
   ): Promise<{ message: string }> {
-    // Implementation would call authService.forgotPassword()
-    throw new Error("Implementation pending");
+    await this.authService.forgotPassword(forgotPasswordDto);
+    return { message: "Password reset email sent" };
   }
 
   @Post("reset-password")
@@ -255,12 +199,13 @@ export class AuthController {
   async resetPassword(
     @Body() resetPasswordDto: ResetPasswordDto,
   ): Promise<{ message: string }> {
-    // Implementation would call authService.resetPassword()
-    throw new Error("Implementation pending");
+    await this.authService.resetPassword(resetPasswordDto);
+    return { message: "Password reset successful" };
   }
 
   @Get("me")
   @ApiBearerAuth("JWT-auth")
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: "Get current user profile",
     description: "Retrieves the profile of the currently authenticated user",
@@ -275,12 +220,12 @@ export class AuthController {
     description: "Authentication required",
   })
   async getProfile(@Request() req: any): Promise<User> {
-    // Implementation would call authService.getUserProfile()
-    throw new Error("Implementation pending");
+    return this.authService.getProfile(req.user.id);
   }
 
   @Put("me")
   @ApiBearerAuth("JWT-auth")
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: "Update user profile",
     description: "Updates the profile of the currently authenticated user",
@@ -306,13 +251,13 @@ export class AuthController {
     @Request() req: any,
     @Body() updateProfileDto: UpdateProfileDto,
   ): Promise<User> {
-    // Implementation would call authService.updateProfile()
-    throw new Error("Implementation pending");
+    return this.authService.updateProfile(req.user.id, updateProfileDto);
   }
 
   @Put("change-password")
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth("JWT-auth")
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: "Change password",
     description: "Changes the password for the currently authenticated user",
@@ -343,12 +288,14 @@ export class AuthController {
     @Request() req: any,
     @Body() changePasswordDto: ChangePasswordDto,
   ): Promise<{ message: string }> {
-    // Implementation would call authService.changePassword()
-    throw new Error("Implementation pending");
+    await this.authService.changePassword(req.user.id, changePasswordDto);
+    return { message: "Password changed successfully" };
   }
 
   @Post("validate-token")
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth("JWT-auth")
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: "Validate access token",
     description: "Validates an access token and returns user information",
@@ -387,12 +334,12 @@ export class AuthController {
     user: Partial<User>;
     permissions: string[];
   }> {
-    // Implementation would call authService.validateToken()
-    throw new Error("Implementation pending");
+    return this.authService.validateToken(body.token);
   }
 
   @Get("permissions")
   @ApiBearerAuth("JWT-auth")
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: "Get user permissions",
     description:
@@ -449,9 +396,8 @@ export class AuthController {
     tenantId: string;
     roles: string[];
     permissions: string[];
-    effectivePermissions: Record<string, Record<string, boolean>>;
+    effectivePermissions: Record<string, Record<string, boolean>>; 
   }> {
-    // Implementation would call authService.getUserPermissions()
-    throw new Error("Implementation pending");
+    return this.authService.getUserPermissions(req.user.id);
   }
 }
