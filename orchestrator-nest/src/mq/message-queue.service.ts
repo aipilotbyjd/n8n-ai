@@ -1,19 +1,22 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Inject } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { ClientProxy } from "@nestjs/microservices";
 
 @Injectable()
 export class MessageQueueService {
   private readonly logger = new Logger(MessageQueueService.name);
 
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private configService: ConfigService,
+    @Inject("ENGINE_SERVICE") private readonly client: ClientProxy,
+  ) {}
 
   async publishWorkflowExecution(workflowExecution: any): Promise<void> {
     this.logger.log("Publishing workflow execution", {
       id: workflowExecution.id,
     });
-    // Implementation would connect to RabbitMQ and publish message
-    // For now, just log the action
-    this.logger.debug("Workflow execution message:", workflowExecution);
+    await this.client.emit("execute-workflow", workflowExecution).toPromise();
+    this.logger.debug("Workflow execution message published:", workflowExecution);
   }
 
   async publishStepExecution(stepExecution: any): Promise<void> {

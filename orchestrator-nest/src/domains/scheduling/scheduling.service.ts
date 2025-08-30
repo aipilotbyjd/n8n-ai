@@ -3,20 +3,14 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  OnModuleInit,
+  OnModuleDestroy,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, LessThan, MoreThan } from "typeorm";
-import { Cron, CronExpression } from "@nestjs/schedule";
 import { EventEmitter2 } from "@nestjs/event-emitter";
-import {
-  Schedule,
-  ScheduleStatus,
-  TriggerType,
-} from "./entities/schedule.entity";
-import {
-  ScheduledExecution,
-  ExecutionStatus,
-} from "./entities/scheduled-execution.entity";
+import { Schedule, ScheduleStatus, TriggerType } from "./entities/schedule.entity";
+import { ScheduledExecution, ExecutionStatus } from "./entities/scheduled-execution.entity";
 import { CreateScheduleDto } from "./dto/create-schedule.dto";
 import { UpdateScheduleDto } from "./dto/update-schedule.dto";
 import { ScheduleResponseDto } from "./dto/schedule-response.dto";
@@ -25,10 +19,13 @@ import { ScheduleValidationService } from "./services/schedule-validation.servic
 import { TriggerService } from "./services/trigger.service";
 import { MetricsService } from "../../observability/metrics.service";
 import { AuditLogService } from "../audit/audit-log.service";
+import { MessageQueueService } from "../../mq/message-queue.service";
+import * as cron from 'node-cron';
 
 @Injectable()
-export class SchedulingService {
+export class SchedulingService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SchedulingService.name);
+  private readonly scheduledTasks = new Map<string, cron.ScheduledTask>();
 
   constructor(
     @InjectRepository(Schedule)
@@ -41,7 +38,68 @@ export class SchedulingService {
     private readonly metricsService: MetricsService,
     private readonly auditService: AuditLogService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly messageQueueService: MessageQueueService,
   ) {}
+
+  async onModuleInit() {
+    this.logger.log("Initializing SchedulingService...");
+    await this.loadAndStartAllSchedules();
+  }
+
+  async onModuleDestroy() {
+    this.logger.log("Destroying SchedulingService...");
+    this.stopAllSchedules();
+  }
+
+  private async loadAndStartAllSchedules(): Promise<void> {
+    const activeSchedules = await this.scheduleRepository.find({
+      where: { isActive: true, status: ScheduleStatus.ACTIVE },
+    });
+
+    this.logger.log(`Found ${activeSchedules.length} active schedules to load.`);
+
+    for (const schedule of activeSchedules) {
+      this.startSchedule(schedule);
+    }
+  }
+
+  private startSchedule(schedule: Schedule): void {
+    if (this.scheduledTasks.has(schedule.id)) {
+      this.scheduledTasks.get(schedule.id).stop();
+      this.scheduledTasks.delete(schedule.id);
+    }
+
+    if (schedule.triggerType === TriggerType.CRON && schedule.cronExpression) {
+      const task = cron.schedule(schedule.cronExpression, async () => {
+        this.logger.debug(`Executing scheduled task for workflow ${schedule.workflowId}`);
+        await this.processSchedule(schedule);
+      }, {
+        timezone: schedule.timezone || undefined,
+      });
+      this.scheduledTasks.set(schedule.id, task);
+      this.logger.log(`Started cron schedule for workflow ${schedule.workflowId} (ID: ${schedule.id})`);
+    } else if (schedule.triggerType === TriggerType.INTERVAL && schedule.intervalSeconds) {
+      // For interval-based schedules, we'll use a simple setTimeout loop
+      // In a real-world scenario, a more robust job queue (e.g., BullMQ) would be used
+      this.logger.warn(`Interval schedules are not fully implemented for persistent scheduling. Schedule ID: ${schedule.id}`);
+    }
+  }
+
+  private stopSchedule(scheduleId: string): void {
+    if (this.scheduledTasks.has(scheduleId)) {
+      this.scheduledTasks.get(scheduleId).stop();
+      this.scheduledTasks.delete(scheduleId);
+      this.logger.log(`Stopped schedule for ID: ${scheduleId}`);
+    }
+  }
+
+  private stopAllSchedules(): void {
+    this.scheduledTasks.forEach((task, scheduleId) => {
+      task.stop();
+      this.logger.log(`Stopped all schedules. Schedule ID: ${scheduleId}`);
+    });
+    this.scheduledTasks.clear();
+  }
 
   /**
    * Create a new schedule
@@ -88,7 +146,7 @@ export class SchedulingService {
       savedSchedule.isActive &&
       savedSchedule.status === ScheduleStatus.ACTIVE
     ) {
-      await this.scheduleNextExecution(savedSchedule);
+      this.startSchedule(savedSchedule);
     }
 
     // Emit event
@@ -215,7 +273,9 @@ export class SchedulingService {
       savedSchedule.isActive &&
       savedSchedule.status === ScheduleStatus.ACTIVE
     ) {
-      await this.rescheduleExecution(savedSchedule);
+      this.startSchedule(savedSchedule);
+    } else {
+      this.stopSchedule(savedSchedule.id);
     }
 
     // Emit event
@@ -266,6 +326,9 @@ export class SchedulingService {
         status: ExecutionStatus.CANCELLED,
       },
     );
+
+    // Stop the cron job
+    this.stopSchedule(id);
 
     // Delete schedule
     await this.scheduleRepository.remove(schedule);
@@ -322,7 +385,7 @@ export class SchedulingService {
     if (isActive) {
       // Recalculate next run time when activating
       schedule.nextRunAt = this.calculateNextRunTime(schedule);
-      await this.scheduleNextExecution(schedule);
+      this.startSchedule(schedule);
     } else {
       // Cancel pending executions when deactivating
       await this.scheduledExecutionRepository.update(
@@ -334,6 +397,7 @@ export class SchedulingService {
           status: ExecutionStatus.CANCELLED,
         },
       );
+      this.stopSchedule(id);
     }
 
     const savedSchedule = await this.scheduleRepository.save(schedule);
@@ -407,7 +471,12 @@ export class SchedulingService {
       await this.scheduledExecutionRepository.save(execution);
 
     // Trigger execution immediately
-    await this.triggerService.executeWorkflow(savedExecution);
+    await this.messageQueueService.publishWorkflowExecution({
+      workflowId: savedExecution.workflowId,
+      executionId: savedExecution.id,
+      tenantId: savedExecution.tenantId,
+      triggerData: savedExecution.triggerData,
+    });
 
     // Update schedule statistics
     schedule.totalExecutions += 1;
@@ -427,7 +496,6 @@ export class SchedulingService {
   /**
    * Cron job to check for due schedules
    */
-  @Cron(CronExpression.EVERY_MINUTE)
   async checkDueSchedules(): Promise<void> {
     this.logger.debug("Checking for due schedules...");
 
@@ -481,7 +549,12 @@ export class SchedulingService {
       await this.scheduledExecutionRepository.save(execution);
 
     // Trigger execution
-    await this.triggerService.executeWorkflow(savedExecution);
+    await this.messageQueueService.publishWorkflowExecution({
+      workflowId: savedExecution.workflowId,
+      executionId: savedExecution.id,
+      tenantId: savedExecution.tenantId,
+      triggerData: savedExecution.triggerData,
+    });
 
     // Update schedule for next run
     schedule.lastRunAt = new Date();
@@ -492,7 +565,7 @@ export class SchedulingService {
 
     // Schedule next execution if there is one
     if (schedule.nextRunAt) {
-      await this.scheduleNextExecution(schedule);
+      // The cron job will pick this up, no need to explicitly schedule here
     }
 
     this.logger.debug(
@@ -628,7 +701,7 @@ export class SchedulingService {
     );
 
     // Schedule new execution
-    await this.scheduleNextExecution(schedule);
+    this.startSchedule(schedule);
   }
 
   /**
@@ -670,3 +743,4 @@ export class SchedulingService {
     };
   }
 }
+
