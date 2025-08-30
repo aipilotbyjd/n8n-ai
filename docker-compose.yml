@@ -51,8 +51,8 @@ services:
       RABBITMQ_DEFAULT_VHOST: /n8n-ai
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
-      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
+      - ./infra/infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./infra/infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -255,6 +255,43 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # Node Runner Service (Node.js)
+  node-runner-js:
+    build:
+      context: ./node-runner-js
+      dockerfile: Dockerfile
+      target: development
+    container_name: n8n-ai-node-runner
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      DATABASE_URL: postgresql://n8n_ai:${POSTGRES_PASSWORD:-n8n_ai_dev}@postgres:5432/engine
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-n8n_ai}:${RABBITMQ_PASSWORD:-n8n_ai_dev}@rabbitmq:5672/n8n-ai
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-n8n_ai_access}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-n8n_ai_secret}
+      JWT_SECRET: ${JWT_SECRET:-super_secret_jwt_key}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-super_secret_encryption_key}
+    volumes:
+      - ./node-runner-js:/app
+      - /app/node_modules
+      - ./contracts:/app/contracts
+      - ./proto-contracts:/app/proto-contracts
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - n8n-ai
+    restart: unless-stopped
 
   # Nginx Load Balancer & API Gateway
   nginx:
