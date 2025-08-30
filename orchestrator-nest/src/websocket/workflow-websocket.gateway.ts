@@ -19,7 +19,7 @@ import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { JwtService } from "@nestjs/jwt";
 import { AuthUser } from "../auth/interfaces/auth-user.interface";
 
-interface AuthenticatedSocket extends Socket {
+interface WorkflowAuthenticatedSocket extends Socket {
   userId: string;
   tenantId: string;
   subscriptions?: Set<string>;
@@ -58,7 +58,7 @@ export class WorkflowWebSocketGateway
   server: Server;
 
   private readonly logger = new Logger(WorkflowWebSocketGateway.name);
-  private readonly connectedClients = new Map<string, AuthenticatedSocket>();
+  private readonly connectedClients = new Map<string, WorkflowAuthenticatedSocket>();
   private readonly subscriptions = new Map<string, Set<string>>(); // resourceId -> Set<clientId>
   private readonly clientSubscriptions = new Map<string, Set<string>>(); // clientId -> Set<resourceId>
   private readonly metrics = {
@@ -84,7 +84,7 @@ export class WorkflowWebSocketGateway
     setInterval(() => this.reportMetrics(), 60000); // 1 minute
   }
 
-  async handleConnection(client: AuthenticatedSocket) {
+  async handleConnection(client: WorkflowAuthenticatedSocket) {
     try {
       // Extract token from query parameters or headers
       const token =
@@ -141,7 +141,7 @@ export class WorkflowWebSocketGateway
     }
   }
 
-  handleDisconnect(client: AuthenticatedSocket) {
+  handleDisconnect(client: WorkflowAuthenticatedSocket) {
     this.logger.log(`Client disconnected: ${client.id}`);
 
     // Clean up subscriptions
@@ -167,7 +167,7 @@ export class WorkflowWebSocketGateway
   @SubscribeMessage("subscribe")
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 subscriptions per minute
   async handleSubscription(
-    @ConnectedSocket() client: AuthenticatedSocket,
+    @ConnectedSocket() client: WorkflowAuthenticatedSocket,
     @MessageBody() data: SubscriptionRequest,
   ) {
     try {
@@ -239,7 +239,7 @@ export class WorkflowWebSocketGateway
   @SubscribeMessage("unsubscribe")
   @Throttle({ default: { limit: 20, ttl: 60000 } }) // 20 unsubscriptions per minute
   handleUnsubscription(
-    @ConnectedSocket() client: AuthenticatedSocket,
+    @ConnectedSocket() client: WorkflowAuthenticatedSocket,
     @MessageBody() data: { subscriptionKey: string },
   ) {
     try {
@@ -277,14 +277,14 @@ export class WorkflowWebSocketGateway
 
   @SubscribeMessage("ping")
   @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 pings per minute
-  handlePing(@ConnectedSocket() client: AuthenticatedSocket) {
+  handlePing(@ConnectedSocket() client: WorkflowAuthenticatedSocket) {
     client.emit("pong", { timestamp: new Date().toISOString() });
   }
 
   @SubscribeMessage("get_status")
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 status requests per minute
   async handleGetStatus(
-    @ConnectedSocket() client: AuthenticatedSocket,
+    @ConnectedSocket() client: WorkflowAuthenticatedSocket,
     @MessageBody() data: { executionId?: string; workflowId?: string },
   ) {
     try {
@@ -587,7 +587,7 @@ export class WorkflowWebSocketGateway
   }
 
   private async sendInitialData(
-    client: AuthenticatedSocket,
+    client: WorkflowAuthenticatedSocket,
     request: SubscriptionRequest,
   ): Promise<void> {
     try {
