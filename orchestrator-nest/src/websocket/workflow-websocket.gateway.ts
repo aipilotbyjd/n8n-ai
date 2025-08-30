@@ -683,4 +683,86 @@ export class WorkflowWebSocketGateway
     // Implement metrics reporting
     this.logger.debug(`Current metrics: ${JSON.stringify(this.metrics)}`);
   }
+
+  /**
+   * Broadcast to all clients in a specific execution
+   * @param tenantId The tenant ID
+   * @param executionId The execution ID
+   * @param message The message to broadcast
+   */
+  async broadcastToExecution(
+    tenantId: string,
+    executionId: string,
+    message: any,
+  ): Promise<void> {
+    const subscriptionKey = `execution:${tenantId}:${executionId}`;
+    await this.broadcastToSubscribers(subscriptionKey, message);
+  }
+
+  /**
+   * Broadcast to all clients subscribed to a specific workflow
+   * @param tenantId The tenant ID
+   * @param workflowId The workflow ID
+   * @param message The message to broadcast
+   */
+  async broadcastToWorkflow(
+    tenantId: string,
+    workflowId: string,
+    message: any,
+  ): Promise<void> {
+    const subscriptionKey = `workflow:${tenantId}:${workflowId}`;
+    await this.broadcastToSubscribers(subscriptionKey, message);
+  }
+
+  /**
+   * Broadcast to all clients in a specific tenant
+   * @param tenantId The tenant ID
+   * @param message The message to broadcast
+   */
+  async broadcastToTenant(tenantId: string, message: any): Promise<void> {
+    const subscriptionKey = `tenant_activity:${tenantId}`;
+    await this.broadcastToSubscribers(subscriptionKey, message);
+  }
+
+  /**
+   * Get connection statistics
+   */
+  getConnectionStats(): any {
+    const connectionsByTenant: Record<string, number> = {};
+
+    // Count connections by tenant
+    this.connectedClients.forEach((client) => {
+      const tenantId = client.tenantId;
+      if (tenantId) {
+        connectionsByTenant[tenantId] = (connectionsByTenant[tenantId] || 0) + 1;
+      }
+    });
+
+    return {
+      totalConnections: this.metrics.connections,
+      connectionsByTenant,
+      activeSubscriptions: this.metrics.subscriptions,
+      messagesPerMinute: this.metrics.messagesSent,
+      errorsPerMinute: this.metrics.errors,
+    };
+  }
+
+  /**
+   * Shutdown the gateway gracefully
+   */
+  async shutdown(): Promise<void> {
+    this.logger.log("Shutting down WebSocket gateway...");
+
+    // Disconnect all clients
+    this.connectedClients.forEach((client) => {
+      client.disconnect(true);
+    });
+
+    // Clear all data
+    this.connectedClients.clear();
+    this.subscriptions.clear();
+    this.clientSubscriptions.clear();
+
+    this.logger.log("WebSocket gateway shutdown complete");
+  }
 }
