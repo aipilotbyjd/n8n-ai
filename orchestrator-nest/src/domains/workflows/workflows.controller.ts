@@ -11,7 +11,6 @@ import {
   HttpStatus,
   ParseUUIDPipe,
   UseGuards,
-  UseInterceptors,
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
@@ -30,7 +29,7 @@ import { UpdateWorkflowDto } from "./dto/update-workflow.dto";
 import { ListWorkflowsDto } from "./dto/list-workflows.dto";
 import { Workflow } from "./entities/workflow.entity";
 import { AuthUser } from "../auth/interfaces/auth-user.interface";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 
 
@@ -40,7 +39,7 @@ import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 @ApiBearerAuth("JWT-auth")
 @UseGuards(JwtAuthGuard)
 export class WorkflowsController {
-  constructor(private readonly workflowsService: WorkflowsService) {}
+  constructor(private readonly workflowsService: WorkflowsService) { }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -168,10 +167,10 @@ export class WorkflowsController {
     status: HttpStatus.UNAUTHORIZED,
     description: "Authentication required",
   })
-  async getWorkflow(@Param("id", ParseUUIDPipe) id: string): Promise<Workflow> {
-    // Extract user from JWTAuthGuard context
+  async getWorkflow(
+    @Param("id", ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthUser,
-
+  ): Promise<Workflow> {
     const workflow = await this.workflowsService.findOne(id, user);
     if (!workflow) {
       throw new NotFoundException(`Workflow with ID ${id} not found`);
@@ -288,10 +287,8 @@ export class WorkflowsController {
   })
   async activateWorkflow(
     @Param("id", ParseUUIDPipe) id: string,
-  ): Promise<Workflow> {
-    // Extract user from JWTAuthGuard context
     @CurrentUser() user: AuthUser,
-
+  ): Promise<Workflow> {
     const workflow = await this.workflowsService.activate(id, user);
     if (!workflow) {
       throw new NotFoundException(`Workflow with ID ${id} not found`);
@@ -416,26 +413,8 @@ export class WorkflowsController {
   async executeWorkflow(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { inputData?: Record<string, any> },
-  ): Promise<any> {
     @CurrentUser() user: AuthUser,
-    return this.workflowsService.triggerExecution(id, user, body.inputData);
-  }
-}
-y: { inputData?: Record<string, any> },
   ): Promise<any> {
-    @CurrentUser() user: AuthUser,
     return this.workflowsService.triggerExecution(id, user, body.inputData);
-  }
-}
-);
-  }
-}
-);
-  }
-}
-user, body.inputData);
-  }
-}
-);
   }
 }

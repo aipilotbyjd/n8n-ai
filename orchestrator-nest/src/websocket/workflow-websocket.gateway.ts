@@ -20,8 +20,8 @@ import { JwtService } from "@nestjs/jwt";
 import { AuthUser } from "../auth/interfaces/auth-user.interface";
 
 interface AuthenticatedSocket extends Socket {
-  userId?: string;
-  tenantId?: string;
+  userId: string;
+  tenantId: string;
   subscriptions?: Set<string>;
 }
 
@@ -53,8 +53,7 @@ interface WebSocketMessage {
 @UseFilters(WsExceptionFilter)
 @UseGuards(ThrottlerGuard)
 export class WorkflowWebSocketGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-{
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -75,7 +74,7 @@ export class WorkflowWebSocketGateway
     private readonly executionsService: ExecutionsService,
     private readonly eventEmitter: EventEmitter2,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   afterInit(server: Server) {
     this.logger.log("WebSocket Gateway initialized");
@@ -174,7 +173,7 @@ export class WorkflowWebSocketGateway
     try {
       this.metrics.messagesReceived++;
 
-      if (!client.tenantId) {
+      if (!client.tenantId || !client.userId) {
         client.emit("error", { message: "Not authenticated" });
         return;
       }
@@ -291,7 +290,7 @@ export class WorkflowWebSocketGateway
     try {
       this.metrics.messagesReceived++;
 
-      if (!client.tenantId) {
+      if (!client.tenantId || !client.userId) {
         client.emit("error", { message: "Not authenticated" });
         return;
       }
