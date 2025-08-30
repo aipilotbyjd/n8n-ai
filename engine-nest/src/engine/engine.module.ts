@@ -1,10 +1,12 @@
-import { ExecutionStateService } from './state/execution-state.service';
-import { NodeDispatcherService } from './dispatcher/node-dispatcher.service';
+import { Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DagService } from './dag/dag.service';
-import { Module } from '@nestjs/common';
 import { ExecutionConsumer } from './consumers/execution.consumer';
+import { NodeDispatcherService } from './dispatcher/node-dispatcher.service';
+import { ExecutionStateService } from './state/execution-state.service';
+import { CacheModule } from '@nestjs/cache-manager';
+import { redisStore } from 'cache-manager-redis-store';
 
 @Module({
   imports: [
@@ -25,9 +27,26 @@ import { ExecutionConsumer } from './consumers/execution.consumer';
         inject: [ConfigService],
       },
     ]),
+    CacheModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        store: await redisStore({
+          socket: {
+            host: configService.get<string>('redis.host'),
+            port: configService.get<number>('redis.port'),
+          }
+        }),
+      }),
+      inject: [ConfigService],
+    }),
   ],
   controllers: [],
-  providers: [ExecutionConsumer, DagService, NodeDispatcherService, ExecutionStateService],
+  providers: [
+    ExecutionConsumer,
+    DagService,
+    NodeDispatcherService,
+    ExecutionStateService,
+  ],
   exports: [ExecutionConsumer],
 })
 export class EngineModule {}
