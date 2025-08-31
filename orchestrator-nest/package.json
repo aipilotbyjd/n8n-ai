@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@n8n-work/contracts": "file:../contracts",
+    "@n8n-work/shared": "file:../shared",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
