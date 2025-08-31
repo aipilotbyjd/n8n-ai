@@ -1,9 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import {
-  WebhookMethod,
-  WebhookStatus,
-  AuthenticationType,
-} from "../entities/webhook.entity";
+import { WebhookMethod, WebhookStatus } from "../entities/webhook.entity";
+import { AuthenticationType } from "@n8n-work/contracts";
 
 export class WebhookResponseDto {
   @ApiProperty({
