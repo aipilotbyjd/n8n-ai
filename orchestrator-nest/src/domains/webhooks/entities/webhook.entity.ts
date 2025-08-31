@@ -30,6 +30,8 @@ export enum AuthType {
   API_KEY = "api_key",
   HMAC = "hmac",
   CUSTOM = "custom",
+  HEADER = "header",
+  SIGNATURE = "signature",
 }
 
 // Alias for compatibility with existing imports
@@ -59,6 +61,16 @@ export class Webhook {
   @Column({ unique: true })
   path: string; // e.g., '/webhook/my-workflow-trigger'
 
+  @Column({ nullable: true })
+  url: string; // Full webhook URL
+
+  @Column({
+    type: "enum",
+    enum: WebhookMethod,
+    default: WebhookMethod.POST,
+  })
+  method: WebhookMethod;
+
   @Column({
     type: "enum",
     enum: WebhookMethod,
@@ -85,8 +97,26 @@ export class Webhook {
   })
   authType: AuthType;
 
+  @Column({
+    type: "enum",
+    enum: AuthType,
+    default: AuthType.NONE,
+  })
+  authenticationType: AuthType;
+
   @Column("text", { nullable: true })
   authConfig: string; // Encrypted authentication configuration
+
+  @Column("text", { nullable: true })
+  secret: string; // Encrypted secret for signature validation
+
+  @Column("jsonb", { nullable: true })
+  authenticationData: {
+    headerName?: string;
+    headerValue?: string;
+    username?: string;
+    password?: string;
+  };
 
   // Request Processing
   @Column({ default: true })
@@ -124,6 +154,9 @@ export class Webhook {
   @Column({ type: "int", default: 30 })
   timeoutSeconds: number;
 
+  @Column({ type: "int", nullable: true })
+  timeoutMs: number; // Timeout in milliseconds
+
   @Column({ default: false })
   enableCors: boolean;
 
@@ -139,6 +172,9 @@ export class Webhook {
 
   @Column({ type: "int", nullable: true })
   rateLimitWindowMs: number; // Window in milliseconds
+
+  @Column({ type: "int", nullable: true })
+  rateLimitPerMinute: number; // Rate limit per minute
 
   // Webhook Validation
   @Column({ default: false })
@@ -170,6 +206,9 @@ export class Webhook {
   @Column({ type: "int", default: 0 })
   failedRequests: number;
 
+  @Column({ type: "int", default: 0 })
+  requestCount: number; // Total request count
+
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   averageResponseTime: number; // In milliseconds
 
@@ -181,6 +220,9 @@ export class Webhook {
 
   @Column({ type: "timestamp", nullable: true })
   lastFailureAt: Date;
+
+  @Column({ type: "timestamp", nullable: true })
+  lastTriggeredAt: Date; // Last time webhook was triggered
 
   // Error Handling
   @Column({ type: "text", nullable: true })

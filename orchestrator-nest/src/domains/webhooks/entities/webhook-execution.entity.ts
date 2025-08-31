@@ -92,6 +92,13 @@ export class WebhookExecution {
   @Column({ nullable: true })
   forwardedFor: string; // X-Forwarded-For header
 
+  // Request headers and body for compatibility
+  @Column("jsonb", { nullable: true })
+  requestHeaders: Record<string, string>; // Request headers (alias)
+
+  @Column("text", { nullable: true })
+  requestBody: string; // Request body (alias)
+
   // Response Details
   @Column({ type: "int", nullable: true })
   responseStatusCode: number;

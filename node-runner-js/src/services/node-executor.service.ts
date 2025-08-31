@@ -15,13 +15,15 @@ export class NodeExecutorService {
 
   private loadBuiltInNodes() {
     const nodesDir = path.join(__dirname, '..', 'nodes');
-    fs.readdirSync(nodesDir).forEach((file) => {
-      if (file.endsWith('.js')) {
-        const nodeType = path.basename(file, '.js');
-        const nodeCode = fs.readFileSync(path.join(nodesDir, file), 'utf-8');
-        this.builtInNodes.set(nodeType, nodeCode);
-      }
-    });
+    if (fs.existsSync(nodesDir)) {
+      fs.readdirSync(nodesDir).forEach((file) => {
+        if (file.endsWith('.js')) {
+          const nodeType = path.basename(file, '.js');
+          const nodeCode = fs.readFileSync(path.join(nodesDir, file), 'utf-8');
+          this.builtInNodes.set(nodeType, nodeCode);
+        }
+      });
+    }
   }
 
   async execute(node: Node, input: any): Promise<any> {

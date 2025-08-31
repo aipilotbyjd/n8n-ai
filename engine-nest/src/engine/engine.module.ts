@@ -17,8 +17,8 @@ import { redisStore } from 'cache-manager-redis-store';
         useFactory: (configService: ConfigService) => ({
           transport: Transport.RMQ,
           options: {
-            urls: [configService.get<string>('rabbitmq.uri')],
-            queue: configService.get<string>('rabbitmq.queues.nodeExecution'),
+            urls: [configService.get<string>('rabbitmq.uri') || 'amqp://localhost:5672'],
+            queue: configService.get<string>('rabbitmq.queues.nodeExecution') || 'node-execution',
             queueOptions: {
               durable: false,
             },
@@ -32,8 +32,8 @@ import { redisStore } from 'cache-manager-redis-store';
       useFactory: async (configService: ConfigService) => ({
         store: await redisStore({
           socket: {
-            host: configService.get<string>('redis.host'),
-            port: configService.get<number>('redis.port'),
+            host: configService.get<string>('redis.host') || 'localhost',
+            port: configService.get<number>('redis.port') || 6379,
           }
         }),
       }),

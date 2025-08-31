@@ -19,7 +19,7 @@ import { CreateWorkflowDto } from "./dto/create-workflow.dto";
 import { UpdateWorkflowDto } from "./dto/update-workflow.dto";
 import { ListWorkflowsDto } from "./dto/list-workflows.dto";
 import { WorkflowValidationService } from "./workflow-validation.service";
-import { AuthUser } from "../auth/interfaces/auth-user.interface";
+import { AuthUser } from "@n8n-work/contracts";
 import { TenantService } from "../tenants/tenants.service";
 import { PaginatedResult } from "../common/interfaces/paginated-result.interface";
 import { WorkflowCompilerService } from "./workflow-compiler.service";
@@ -585,5 +585,87 @@ export class WorkflowsService {
       .getCount();
 
     return count > 0;
+  }
+
+  async duplicate(
+    id: string,
+    user: AuthUser,
+    newName?: string,
+  ): Promise<Workflow> {
+    this.logger.debug(`Duplicating workflow ${id} for user ${user.userId}`);
+
+    const originalWorkflow = await this.findOne(id, user);
+
+    // Generate new name if not provided
+    const baseName = newName || `${originalWorkflow.name} (Copy)`;
+    let finalName = baseName;
+    let counter = 1;
+
+    // Ensure unique name within tenant
+    while (true) {
+      const existing = await this.workflowRepository.findOne({
+        where: {
+          name: finalName,
+          tenantId: user.tenantId,
+        },
+      });
+
+      if (!existing) {
+        break;
+      }
+
+      finalName = `${baseName} (${counter})`;
+      counter++;
+    }
+
+    // Create duplicate workflow
+    const duplicatedWorkflow = this.workflowRepository.create({
+      ...originalWorkflow,
+      id: undefined, // Let TypeORM generate new ID
+      name: finalName,
+      status: WorkflowStatus.DRAFT,
+      createdBy: user.userId,
+      createdAt: undefined, // Let TypeORM set current timestamp
+      updatedAt: undefined,
+      updatedBy: user.userId,
+      executionCount: 0,
+      successCount: 0,
+      failureCount: 0,
+      avgExecutionTimeMs: 0,
+      lastExecutionAt: null,
+    });
+
+    const savedWorkflow = await this.workflowRepository.save(duplicatedWorkflow);
+
+    // Clear cache
+    await this.clearWorkflowCache(user.tenantId);
+
+    // Emit workflow duplicated event
+    this.eventEmitter.emit('workflow.duplicated', {
+      originalWorkflowId: id,
+      newWorkflowId: savedWorkflow.id,
+      userId: user.userId,
+      tenantId: user.tenantId,
+    });
+
+    // Log audit event
+    await this.auditLogService.log({
+      action: 'workflow.duplicated',
+      resourceType: 'workflow',
+      resourceId: savedWorkflow.id,
+      userId: user.userId,
+      tenantId: user.tenantId,
+      metadata: {
+        originalWorkflowId: id,
+        originalName: originalWorkflow.name,
+        newName: finalName,
+      },
+    });
+
+    this.logger.log(
+      `Workflow ${id} duplicated as ${savedWorkflow.id} by user ${user.userId}`,
+    );
+
+    return savedWorkflow;
   }
 }

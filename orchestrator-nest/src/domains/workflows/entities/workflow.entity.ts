@@ -98,6 +98,7 @@ export class Workflow {
     description: "Workflow nodes configuration",
     type: "object",
     isArray: true,
+    additionalProperties: true,
   })
   @Column({ type: "jsonb" })
   nodes: WorkflowNode[];
@@ -106,6 +107,7 @@ export class Workflow {
     description: "Workflow edges configuration",
     type: "object",
     isArray: true,
+    additionalProperties: true,
   })
   @Column({ type: "jsonb" })
   edges: WorkflowEdge[];
@@ -114,6 +116,7 @@ export class Workflow {
     description: "Workflow node connections",
     type: "object",
     isArray: true,
+    additionalProperties: true,
   })
   @Column({ type: "jsonb", default: [] })
   connections: WorkflowConnectionDto[];
@@ -121,6 +124,7 @@ export class Workflow {
   @ApiProperty({
     description: "Workflow settings and configuration",
     type: "object",
+    additionalProperties: true,
   })
   @Column({ type: "jsonb", default: {} })
   settings: Record<string, any>;
@@ -128,6 +132,7 @@ export class Workflow {
   @ApiProperty({
     description: "Workflow metadata and labels",
     type: "object",
+    additionalProperties: true,
   })
   @Column({ type: "jsonb", default: {} })
   metadata: Record<string, any>;
@@ -135,6 +140,7 @@ export class Workflow {
   @ApiProperty({
     description: "Workflow trigger configuration",
     type: "object",
+    additionalProperties: true,
   })
   @Column({ type: "jsonb", nullable: true })
   triggerConfig: Record<string, any>;
@@ -142,6 +148,7 @@ export class Workflow {
   @ApiProperty({
     description: "Workflow scheduling configuration",
     type: "object",
+    additionalProperties: true,
   })
   @Column({ type: "jsonb", nullable: true })
   scheduleConfig: Record<string, any>;

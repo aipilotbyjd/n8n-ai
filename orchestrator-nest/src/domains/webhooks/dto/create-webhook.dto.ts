@@ -55,6 +55,7 @@ export class CreateWebhookDto {
   @ApiPropertyOptional({
     description: "Authentication configuration data",
     type: "object",
+    additionalProperties: true,
     example: {
       headerName: "X-API-Key",
       headerValue: "secret-key-value",
@@ -91,6 +92,7 @@ export class CreateWebhookDto {
   @ApiPropertyOptional({
     description: "Additional webhook configuration",
     type: "object",
+    additionalProperties: true,
   })
   @IsOptional()
   @IsObject()

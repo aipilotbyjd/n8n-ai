@@ -12,6 +12,7 @@ export class ProcessWebhookDto {
   @ApiProperty({
     description: "Request body data",
     type: "object",
+    additionalProperties: true,
     example: {
       event: "order.created",
       order_id: "12345",
@@ -24,6 +25,7 @@ export class ProcessWebhookDto {
   @ApiPropertyOptional({
     description: "Query parameters from the request",
     type: "object",
+    additionalProperties: true,
     example: {
       source: "payment_gateway",
       version: "v1",

@@ -2,33 +2,34 @@ import {
   Controller,
   Get,
   Post,
-  Put,
-  Delete,
   Body,
+  Patch,
   Param,
-  Query,
+  Delete,
+  UseGuards,
   HttpCode,
   HttpStatus,
-  ParseUUIDPipe,
-  UseGuards,
-  NotFoundException,
+  Query,
   BadRequestException,
+  Put,
+  ParseUUIDPipe,
+  NotFoundException,
 } from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiParam,
-  ApiQuery,
-  ApiBearerAuth,
   ApiBody,
+  ApiQuery,
+  ApiParam,
+  ApiBearerAuth,
 } from "@nestjs/swagger";
 import { WorkflowsService } from "./workflows.service";
 import { CreateWorkflowDto } from "./dto/create-workflow.dto";
 import { UpdateWorkflowDto } from "./dto/update-workflow.dto";
 import { ListWorkflowsDto } from "./dto/list-workflows.dto";
 import { Workflow } from "./entities/workflow.entity";
-import { AuthUser } from "../auth/interfaces/auth-user.interface";
+import { AuthUser } from "@n8n-work/contracts";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 
