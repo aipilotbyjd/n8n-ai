@@ -4,124 +4,67 @@ import {
   ExecutionContext,
   CallHandler,
   Logger,
-} from "@nestjs/common";
-import { Observable } from "rxjs";
-import { tap } from "rxjs/operators";
-import { Request, Response } from "express";
-import { trace, context } from "@opentelemetry/api";
+} from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { tap, catchError } from 'rxjs/operators';
+import { Request, Response } from 'express';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger(LoggingInterceptor.name);
 
-  intercept(
-    executionContext: ExecutionContext,
-    next: CallHandler,
-  ): Observable<any> {
-    const request = executionContext.switchToHttp().getRequest<Request>();
-    const response = executionContext.switchToHttp().getResponse<Response>();
-
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    const request = context.switchToHttp().getRequest<Request>();
+    const response = context.switchToHttp().getResponse<Response>();
     const { method, url, ip, headers } = request;
-    const userAgent = headers["user-agent"] || "";
+    const userAgent = headers['user-agent'] || '';
+    const correlationId = headers['x-correlation-id'] || headers['x-request-id'] || this.generateCorrelationId();
     const startTime = Date.now();
 
-    // Get current span for tracing
-    const span = trace.getActiveSpan();
-    const traceId = span?.spanContext().traceId;
-    const spanId = span?.spanContext().spanId;
-
-    // Extract user information if available
-    const userId = (request as any).user?.id;
-    const tenantId = (request as any).user?.tenantId;
-
-    // Log request
-    this.logger.log("Incoming request", {
-      method,
-      url,
-      ip,
-      userAgent,
-      userId,
-      tenantId,
-      traceId,
-      spanId,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Add request attributes to span
-    if (span) {
-      span.setAttributes({
-        "http.method": method,
-        "http.url": url,
-        "http.user_agent": userAgent,
-        "user.id": userId || "",
-        "tenant.id": tenantId || "",
-      });
-    }
+    // Log incoming request
+    this.logger.log(
+      `Incoming ${method} ${url} - IP: ${ip} - User-Agent: ${userAgent} - Correlation-ID: ${correlationId}`,
+      'HTTP Request'
+    );
 
     return next.handle().pipe(
-      tap({
-        next: (responseBody) => {
-          const duration = Date.now() - startTime;
-          const { statusCode } = response;
+      tap((data) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        const statusCode = response.statusCode;
 
-          // Log successful response
-          this.logger.log("Request completed", {
-            method,
-            url,
-            statusCode,
-            duration: `${duration}ms`,
-            userId,
-            tenantId,
-            traceId,
-            spanId,
-            timestamp: new Date().toISOString(),
-          });
+        // Log successful response
+        this.logger.log(
+          `Completed ${method} ${url} - Status: ${statusCode} - Duration: ${duration}ms - Correlation-ID: ${correlationId}`,
+          'HTTP Response'
+        );
 
-          // Add response attributes to span
-          if (span) {
-            span.setAttributes({
-              "http.status_code": statusCode,
-              "http.response_time_ms": duration,
-            });
+        // Log slow requests
+        if (duration > 1000) {
+          this.logger.warn(
+            `Slow request detected: ${method} ${url} took ${duration}ms - Correlation-ID: ${correlationId}`,
+            'Performance Warning'
+          );
+        }
+      }),
+      catchError((error) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        const statusCode = error.status || 500;
 
-            span.setStatus({
-              code: statusCode < 400 ? 1 : 2, // OK or ERROR
-              message: statusCode < 400 ? "OK" : "Request failed",
-            });
-          }
-        },
-        error: (error) => {
-          const duration = Date.now() - startTime;
-          const statusCode = response.statusCode || 500;
+        // Log error response
+        this.logger.error(
+          `Failed ${method} ${url} - Status: ${statusCode} - Duration: ${duration}ms - Error: ${error.message} - Correlation-ID: ${correlationId}`,
+          error.stack,
+          'HTTP Error'
+        );
 
-          // Log error response
-          this.logger.error("Request failed", {
-            method,
-            url,
-            statusCode,
-            duration: `${duration}ms`,
-            error: error.message,
-            userId,
-            tenantId,
-            traceId,
-            spanId,
-            timestamp: new Date().toISOString(),
-          });
-
-          // Add error attributes to span
-          if (span) {
-            span.setAttributes({
-              "http.status_code": statusCode,
-              "http.response_time_ms": duration,
-              error: true,
-              "error.message": error.message,
-            });
-
-            span.recordException(error);
-            span.setStatus({ code: 2, message: error.message }); // ERROR
-          }
-        },
+        throw error;
       }),
     );
+  }
+
+  private generateCorrelationId(): string {
+    return `corr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 }
