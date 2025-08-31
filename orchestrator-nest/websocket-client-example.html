@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Client Example</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background-color: #f8f9fa;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #007bff;
+            background-color: white;
+        }
+        .message.error { border-left-color: #dc3545; }
+        .message.success { border-left-color: #28a745; }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button.primary { background-color: #007bff; color: white; }
+        button.success { background-color: #28a745; color: white; }
+        button.danger { background-color: #dc3545; color: white; }
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Client Example</h1>
+    
+    <div class="container">
+        <h3>Connection</h3>
+        <input type="text" id="serverUrl" placeholder="Server URL" value="http://localhost:3000">
+        <input type="text" id="token" placeholder="JWT Token">
+        <button class="primary" onclick="connect()">Connect</button>
+        <button class="danger" onclick="disconnect()">Disconnect</button>
+        <div id="connectionStatus" class="status disconnected">Disconnected</div>
+    </div>
+
+    <div class="container">
+        <h3>Subscription</h3>
+        <select id="subscriptionType">
+            <option value="workflow">Workflow</option>
+            <option value="execution">Execution</option>
+            <option value="logs">Logs</option>
+            <option value="metrics">Metrics</option>
+            <option value="tenant_activity">Tenant Activity</option>
+        </select>
+        <input type="text" id="resourceId" placeholder="Resource ID (optional)">
+        <button class="success" onclick="subscribe()">Subscribe</button>
+        <button class="danger" onclick="unsubscribe()">Unsubscribe</button>
+    </div>
+
+    <div class="container">
+        <h3>Actions</h3>
+        <button onclick="ping()">Ping</button>
+        <button onclick="getStatus()">Get Status</button>
+        <button onclick="clearMessages()">Clear Messages</button>
+    </div>
+
+    <div class="container">
+        <h3>Messages</h3>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        let socket = null;
+        let currentSubscription = null;
+
+        function connect() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const token = document.getElementById('token').value;
+
+            if (!token) {
+                addMessage('Please provide a JWT token', 'error');
+                return;
+            }
+
+            try {
+                socket = io(`${serverUrl}/workflow`, {
+                    auth: { token },
+                    transports: ['websocket', 'polling']
+                });
+
+                socket.on('connect', () => {
+                    updateConnectionStatus('Connected', 'connected');
+                    addMessage('Connected to WebSocket server', 'success');
+                });
+
+                socket.on('disconnect', () => {
+                    updateConnectionStatus('Disconnected', 'disconnected');
+                    addMessage('Disconnected from WebSocket server', 'error');
+                });
+
+                socket.on('connected', (data) => {
+                    addMessage(`Connection confirmed: ${JSON.stringify(data)}`, 'success');
+                });
+
+                socket.on('error', (data) => {
+                    addMessage(`Error: ${JSON.stringify(data)}`, 'error');
+                });
+
+                socket.on('subscription_confirmed', (data) => {
+                    currentSubscription = data.subscriptionKey;
+                    addMessage(`Subscription confirmed: ${JSON.stringify(data)}`, 'success');
+                });
+
+                socket.on('unsubscription_confirmed', (data) => {
+                    currentSubscription = null;
+                    addMessage(`Unsubscription confirmed: ${JSON.stringify(data)}`, 'info');
+                });
+
+                socket.on('update', (data) => {
+                    addMessage(`Update received: ${JSON.stringify(data)}`, 'info');
+                });
+
+                socket.on('initial_data', (data) => {
+                    addMessage(`Initial data: ${JSON.stringify(data)}`, 'info');
+                });
+
+                socket.on('pong', (data) => {
+                    addMessage(`Pong: ${JSON.stringify(data)}`, 'info');
+                });
+
+                socket.on('status_response', (data) => {
+                    addMessage(`Status response: ${JSON.stringify(data)}`, 'info');
+                });
+
+                socket.on('tenant_stats', (data) => {
+                    addMessage(`Tenant stats: ${JSON.stringify(data)}`, 'info');
+                });
+
+            } catch (error) {
+                addMessage(`Connection error: ${error.message}`, 'error');
+            }
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                currentSubscription = null;
+                updateConnectionStatus('Disconnected', 'disconnected');
+            }
+        }
+
+        function subscribe() {
+            if (!socket) {
+                addMessage('Not connected', 'error');
+                return;
+            }
+
+            const type = document.getElementById('subscriptionType').value;
+            const resourceId = document.getElementById('resourceId').value;
+
+            const subscriptionData = {
+                type: type,
+                resourceId: resourceId || undefined
+            };
+
+            socket.emit('subscribe', subscriptionData);
+            addMessage(`Subscribing to: ${JSON.stringify(subscriptionData)}`, 'info');
+        }
+
+        function unsubscribe() {
+            if (!socket || !currentSubscription) {
+                addMessage('No active subscription', 'error');
+                return;
+            }
+
+            socket.emit('unsubscribe', { subscriptionKey: currentSubscription });
+            addMessage(`Unsubscribing from: ${currentSubscription}`, 'info');
+        }
+
+        function ping() {
+            if (!socket) {
+                addMessage('Not connected', 'error');
+                return;
+            }
+
+            socket.emit('ping', { timestamp: new Date().toISOString() });
+            addMessage('Ping sent', 'info');
+        }
+
+        function getStatus() {
+            if (!socket) {
+                addMessage('Not connected', 'error');
+                return;
+            }
+
+            const resourceId = document.getElementById('resourceId').value;
+            const type = document.getElementById('subscriptionType').value;
+
+            let statusData = {};
+            if (type === 'execution' && resourceId) {
+                statusData = { executionId: resourceId };
+            } else if (type === 'workflow' && resourceId) {
+                statusData = { workflowId: resourceId };
+            }
+
+            socket.emit('get_status', statusData);
+            addMessage(`Status request: ${JSON.stringify(statusData)}`, 'info');
+        }
+
+        function updateConnectionStatus(text, className) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.textContent = text;
+            statusElement.className = `status ${className}`;
+        }
+
+        function addMessage(text, type = 'info') {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+
+        // Auto-connect on page load (for testing)
+        // Uncomment the line below to auto-connect when you have a valid token
+        // connect();
+    </script>
+</body>
+</html>

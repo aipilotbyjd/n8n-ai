@@ -9,19 +9,26 @@ import {
   OnGatewayInit,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
-import { Logger, UseGuards, UseFilters } from "@nestjs/common";
-import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { Logger, UseGuards, UseFilters, UsePipes, ValidationPipe, UseInterceptors } from "@nestjs/common";
 import { WsExceptionFilter } from "../common/filters/ws-exception.filter";
+import { WebSocketAuthGuard, AuthenticatedSocket } from "./guards/websocket-auth.guard";
+import { WebSocketLoggingInterceptor } from "./interceptors/websocket-logging.interceptor";
+import { 
+  SubscriptionRequestDto, 
+  UnsubscribeRequestDto, 
+  StatusRequestDto,
+  PingMessageDto 
+} from "./dto/websocket.dto";
 import { WorkflowsService } from "../domains/workflows/workflows.service";
 import { ExecutionsService } from "../domains/executions/executions.service";
 import { EventEmitter2, OnEvent } from "@nestjs/event-emitter";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { JwtService } from "@nestjs/jwt";
 import { AuthUser } from "../auth/interfaces/auth-user.interface";
+import { WebSocketService } from "./websocket.service";
+import { ConfigService } from "@nestjs/config";
 
-interface WorkflowAuthenticatedSocket extends Socket {
-  userId: string;
-  tenantId: string;
+interface WorkflowAuthenticatedSocket extends AuthenticatedSocket {
   subscriptions?: Set<string>;
 }
 
@@ -49,9 +56,15 @@ interface WebSocketMessage {
   },
   namespace: "/workflow",
   transports: ["websocket", "polling"],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 10000,
+  maxHttpBufferSize: 1e6,
 })
 @UseFilters(WsExceptionFilter)
-@UseGuards(ThrottlerGuard)
+@UseGuards(ThrottlerGuard, WebSocketAuthGuard)
+@UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+@UseInterceptors(WebSocketLoggingInterceptor)
 export class WorkflowWebSocketGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -74,10 +87,15 @@ export class WorkflowWebSocketGateway
     private readonly executionsService: ExecutionsService,
     private readonly eventEmitter: EventEmitter2,
     private readonly jwtService: JwtService,
+    private readonly webSocketService: WebSocketService,
+    private readonly configService: ConfigService,
   ) { }
 
   afterInit(server: Server) {
     this.logger.log("WebSocket Gateway initialized");
+    
+    // Connect the service to this gateway
+    this.webSocketService.setGateway(this);
 
     // Set up periodic cleanup and metrics reporting
     setInterval(() => this.cleanupInactiveConnections(), 300000); // 5 minutes
@@ -86,31 +104,8 @@ export class WorkflowWebSocketGateway
 
   async handleConnection(client: WorkflowAuthenticatedSocket) {
     try {
-      // Extract token from query parameters or headers
-      const token =
-        client.handshake.auth?.token || client.handshake.query?.token;
-
-      if (!token) {
-        this.logger.warn(
-          `Connection rejected: No authentication token provided`,
-        );
-        client.emit("error", { message: "Authentication token required" });
-        client.disconnect();
-        return;
-      }
-
-      // Validate token and extract user info
-      const userInfo = await this.validateToken(token as string);
-      if (!userInfo) {
-        this.logger.warn(`Connection rejected: Invalid token`);
-        client.emit("error", { message: "Invalid authentication token" });
-        client.disconnect();
-        return;
-      }
-
-      // Set user context
-      client.userId = userInfo.userId;
-      client.tenantId = userInfo.tenantId;
+      // Authentication is now handled by WebSocketAuthGuard
+      // Just set up the client
       client.subscriptions = new Set();
 
       // Store connection
@@ -168,7 +163,7 @@ export class WorkflowWebSocketGateway
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 subscriptions per minute
   async handleSubscription(
     @ConnectedSocket() client: WorkflowAuthenticatedSocket,
-    @MessageBody() data: SubscriptionRequest,
+    @MessageBody() data: SubscriptionRequestDto,
   ) {
     try {
       this.metrics.messagesReceived++;
@@ -240,7 +235,7 @@ export class WorkflowWebSocketGateway
   @Throttle({ default: { limit: 20, ttl: 60000 } }) // 20 unsubscriptions per minute
   handleUnsubscription(
     @ConnectedSocket() client: WorkflowAuthenticatedSocket,
-    @MessageBody() data: { subscriptionKey: string },
+    @MessageBody() data: UnsubscribeRequestDto,
   ) {
     try {
       this.metrics.messagesReceived++;
@@ -277,7 +272,10 @@ export class WorkflowWebSocketGateway
 
   @SubscribeMessage("ping")
   @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 pings per minute
-  handlePing(@ConnectedSocket() client: WorkflowAuthenticatedSocket) {
+  handlePing(
+    @ConnectedSocket() client: WorkflowAuthenticatedSocket,
+    @MessageBody() data: PingMessageDto,
+  ) {
     client.emit("pong", { timestamp: new Date().toISOString() });
   }
 
@@ -285,7 +283,7 @@ export class WorkflowWebSocketGateway
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 status requests per minute
   async handleGetStatus(
     @ConnectedSocket() client: WorkflowAuthenticatedSocket,
-    @MessageBody() data: { executionId?: string; workflowId?: string },
+    @MessageBody() data: StatusRequestDto,
   ) {
     try {
       this.metrics.messagesReceived++;
@@ -651,28 +649,7 @@ export class WorkflowWebSocketGateway
     };
   }
 
-  private async validateToken(
-    token: string,
-  ): Promise<{ userId: string; tenantId: string } | null> {
-    try {
-      // Use the injected JWT service for token validation
-      const decoded: any = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_SECRET || "default-secret",
-      });
 
-      if (!decoded || !decoded.sub || !decoded.tenantId) {
-        return null;
-      }
-
-      return {
-        userId: decoded.sub,
-        tenantId: decoded.tenantId,
-      };
-    } catch (error: any) {
-      this.logger.error(`Token validation error: ${error.message}`);
-      return null;
-    }
-  }
 
   private async cleanupInactiveConnections(): Promise<void> {
     // Implement cleanup logic for inactive connections
