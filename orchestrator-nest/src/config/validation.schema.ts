@@ -1,97 +1,143 @@
-import * as Joi from "joi";
+import * as Joi from 'joi';
 
-export const validationSchema = Joi.object({
+export default Joi.object({
   // Application
   NODE_ENV: Joi.string()
-    .valid("development", "production", "test", "staging")
-    .default("development"),
+    .valid('development', 'production', 'test', 'staging')
+    .default('development'),
   PORT: Joi.number().default(3000),
-  APP_NAME: Joi.string().default("n8n-work-orchestrator"),
-  APP_VERSION: Joi.string().default("0.1.0"),
-  CORS_ORIGIN: Joi.string().default("http://localhost:3000"),
+  APP_VERSION: Joi.string().default('1.0.0'),
 
   // Database
-  DB_HOST: Joi.string().default("localhost"),
-  DB_PORT: Joi.number().default(5432),
-  DB_USERNAME: Joi.string().default("n8nwork"),
-  DB_PASSWORD: Joi.string().default("n8nwork_dev"),
-  DB_DATABASE: Joi.string().default("n8nwork"),
-  DB_SSL: Joi.boolean().default(false),
-  DB_SYNCHRONIZE: Joi.boolean().default(false),
-  DB_LOGGING: Joi.boolean().default(false),
-  DB_MIGRATIONS_RUN: Joi.boolean().default(true),
+  DATABASE_HOST: Joi.string().default('localhost'),
+  DATABASE_PORT: Joi.number().default(5432),
+  DATABASE_NAME: Joi.string().required(),
+  DATABASE_USER: Joi.string().required(),
+  DATABASE_PASSWORD: Joi.string().required(),
+  DATABASE_URI: Joi.string().optional(),
 
   // Redis
-  REDIS_HOST: Joi.string().default("localhost"),
+  REDIS_HOST: Joi.string().default('localhost'),
   REDIS_PORT: Joi.number().default(6379),
   REDIS_PASSWORD: Joi.string().optional(),
   REDIS_DB: Joi.number().default(0),
-  REDIS_KEY_PREFIX: Joi.string().default("n8nwork:"),
+  REDIS_URI: Joi.string().optional(),
 
-  // Message Queue
-  RABBITMQ_URL: Joi.string().default(
-    "amqp://n8nwork:n8nwork_dev@localhost:5672",
-  ),
-  MQ_WORKFLOW_EXCHANGE: Joi.string().default("workflow.execute"),
-  MQ_EXECUTION_EXCHANGE: Joi.string().default("execution.step"),
-  MQ_EVENTS_EXCHANGE: Joi.string().default("run.event"),
-  MQ_WORKFLOW_QUEUE: Joi.string().default("workflow.execution"),
-  MQ_STEP_QUEUE: Joi.string().default("step.execution"),
-  MQ_EVENT_QUEUE: Joi.string().default("event.notification"),
+  // RabbitMQ
+  RABBITMQ_HOST: Joi.string().default('localhost'),
+  RABBITMQ_PORT: Joi.number().default(5672),
+  RABBITMQ_USER: Joi.string().default('guest'),
+  RABBITMQ_PASSWORD: Joi.string().default('guest'),
+  RABBITMQ_VHOST: Joi.string().default('/'),
+  RABBITMQ_URI: Joi.string().optional(),
+  RABBITMQ_QUEUES_EXECUTIONS: Joi.string().default('executions'),
+  RABBITMQ_QUEUES_NODE_RUNNER: Joi.string().default('node_runner'),
 
-  // Authentication & Security
-  JWT_SECRET: Joi.string().min(32).required(),
-  JWT_EXPIRES_IN: Joi.string().default("24h"),
-  BCRYPT_ROUNDS: Joi.number().min(10).max(15).default(12),
-  API_KEY_HEADER: Joi.string().default("X-API-Key"),
+  // JWT
+  JWT_SECRET: Joi.string().required(),
+  JWT_EXPIRES_IN: Joi.string().default('24h'),
+  JWT_REFRESH_SECRET: Joi.string().optional(),
+  JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
 
-  // Encryption
-  ENCRYPTION_ALGORITHM: Joi.string().default("aes-256-gcm"),
-  ENCRYPTION_KEY: Joi.string().length(32).required(),
+  // Security
+  BCRYPT_ROUNDS: Joi.number().default(12),
+  THROTTLE_TTL: Joi.number().default(60),
+  THROTTLE_LIMIT: Joi.number().default(100),
+
+  // CORS
+  CORS_ORIGINS: Joi.string().default('http://localhost:3000'),
+
+  // Logging
+  LOG_LEVEL: Joi.string()
+    .valid('error', 'warn', 'info', 'debug', 'verbose')
+    .default('info'),
+
+  // Monitoring
+  ENABLE_METRICS: Joi.boolean().default(true),
+  ENABLE_TRACING: Joi.boolean().default(true),
 
   // External Services
-  EXECUTION_ENGINE_TYPE: Joi.string().valid("go", "nest").default("nest"),
-  ENGINE_GRPC_URL: Joi.string().default("localhost:50051"),
-  NODE_RUNNER_URL: Joi.string().uri().default("http://localhost:3002"),
-  CLICKHOUSE_URL: Joi.string().uri().default("http://localhost:8123"),
-  MINIO_ENDPOINT: Joi.string().default("localhost:9000"),
-  MINIO_ACCESS_KEY: Joi.string().default("n8nwork"),
-  MINIO_SECRET_KEY: Joi.string().default("n8nwork_dev"),
+  ENGINE_SERVICE_URL: Joi.string().optional(),
+  NODE_RUNNER_SERVICE_URL: Joi.string().optional(),
 
-  // Observability
-  OTEL_EXPORTER_OTLP_ENDPOINT: Joi.string()
-    .uri()
-    .default("http://localhost:4317"),
-  OTEL_SERVICE_NAME: Joi.string().default("n8n-work-orchestrator"),
-  OTEL_SERVICE_VERSION: Joi.string().default("0.1.0"),
-  OTEL_ENABLE_TRACING: Joi.boolean().default(true),
-  OTEL_ENABLE_METRICS: Joi.boolean().default(true),
-  OTEL_ENABLE_LOGS: Joi.boolean().default(true),
+  // File Storage
+  STORAGE_TYPE: Joi.string().valid('local', 's3', 'gcs').default('local'),
+  STORAGE_PATH: Joi.string().default('./uploads'),
+  AWS_ACCESS_KEY_ID: Joi.string().optional(),
+  AWS_SECRET_ACCESS_KEY: Joi.string().optional(),
+  AWS_REGION: Joi.string().optional(),
+  AWS_S3_BUCKET: Joi.string().optional(),
+
+  // Email
+  EMAIL_HOST: Joi.string().optional(),
+  EMAIL_PORT: Joi.number().optional(),
+  EMAIL_USER: Joi.string().optional(),
+  EMAIL_PASSWORD: Joi.string().optional(),
+  EMAIL_FROM: Joi.string().optional(),
+
+  // Webhooks
+  WEBHOOK_SECRET: Joi.string().optional(),
+  WEBHOOK_TIMEOUT: Joi.number().default(30000),
+
+  // Scheduling
+  SCHEDULER_ENABLED: Joi.boolean().default(true),
+  SCHEDULER_INTERVAL: Joi.number().default(60000),
+
+  // Cache
+  CACHE_TTL: Joi.number().default(300),
+  CACHE_MAX_ITEMS: Joi.number().default(1000),
 
   // Rate Limiting
-  RATE_LIMIT_TTL: Joi.number().default(60000),
-  RATE_LIMIT_REQUESTS: Joi.number().default(100),
+  RATE_LIMIT_WINDOW: Joi.number().default(900000), // 15 minutes
+  RATE_LIMIT_MAX_REQUESTS: Joi.number().default(100),
+  RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS: Joi.boolean().default(false),
+
+  // Database Connection Pool
+  DATABASE_POOL_MIN: Joi.number().default(1),
+  DATABASE_POOL_MAX: Joi.number().default(10),
+  DATABASE_POOL_IDLE_TIMEOUT: Joi.number().default(30000),
+
+  // Redis Connection Pool
+  REDIS_POOL_MIN: Joi.number().default(1),
+  REDIS_POOL_MAX: Joi.number().default(10),
+
+  // RabbitMQ Connection
+  RABBITMQ_PREFETCH_COUNT: Joi.number().default(1),
+  RABBITMQ_RECONNECT_TIME_IN_MS: Joi.number().default(5000),
+  RABBITMQ_HEARTBEAT_INTERVAL_IN_SECONDS: Joi.number().default(60),
+
+  // Health Checks
+  HEALTH_CHECK_TIMEOUT: Joi.number().default(5000),
+  HEALTH_CHECK_INTERVAL: Joi.number().default(30000),
+
+  // Metrics
+  METRICS_PORT: Joi.number().default(9090),
+  METRICS_PATH: Joi.string().default('/metrics'),
+
+  // Tracing
+  TRACING_SERVICE_NAME: Joi.string().default('n8n-work-orchestrator'),
+  TRACING_SERVICE_VERSION: Joi.string().default('1.0.0'),
+  TRACING_ENDPOINT: Joi.string().optional(),
 
   // Feature Flags
-  FEATURE_WEBHOOKS: Joi.boolean().default(true),
-  FEATURE_MARKETPLACE: Joi.boolean().default(false),
-  FEATURE_BILLING: Joi.boolean().default(false),
-  FEATURE_ADVANCED_AUTH: Joi.boolean().default(false),
+  FEATURE_AI_AGENTS: Joi.boolean().default(false),
+  FEATURE_PLUGIN_MARKETPLACE: Joi.boolean().default(false),
+  FEATURE_ADVANCED_MONITORING: Joi.boolean().default(false),
   FEATURE_MULTI_TENANCY: Joi.boolean().default(true),
 
   // Limits
-  MAX_WORKFLOW_SIZE: Joi.number().default(1048576), // 1MB
-  MAX_EXECUTION_TIME: Joi.number().default(3600000), // 1 hour
-  MAX_CONCURRENT_EXECUTIONS: Joi.number().default(100),
-  MAX_RETRY_ATTEMPTS: Joi.number().min(1).max(10).default(5),
+  MAX_WORKFLOWS_PER_TENANT: Joi.number().default(1000),
+  MAX_EXECUTIONS_PER_WORKFLOW: Joi.number().default(10000),
+  MAX_NODES_PER_WORKFLOW: Joi.number().default(100),
+  MAX_WEBHOOKS_PER_WORKFLOW: Joi.number().default(10),
 
-  // Storage
-  ARTIFACTS_BUCKET: Joi.string().default("n8n-work-artifacts"),
-  BACKUPS_BUCKET: Joi.string().default("n8n-work-backups"),
-  TEMP_BUCKET: Joi.string().default("n8n-work-temp"),
+  // Timeouts
+  WORKFLOW_EXECUTION_TIMEOUT: Joi.number().default(300000), // 5 minutes
+  NODE_EXECUTION_TIMEOUT: Joi.number().default(30000), // 30 seconds
+  WEBHOOK_TIMEOUT: Joi.number().default(30000), // 30 seconds
 
-  // Notifications
-  DEFAULT_NOTIFICATION_CHANNELS: Joi.string().default("email,slack"),
-  EMAIL_PROVIDER: Joi.string().valid("smtp", "sendgrid", "ses").default("smtp"),
-  SLACK_WEBHOOK_URL: Joi.string().uri().optional(),
+  // Retention
+  EXECUTION_LOG_RETENTION_DAYS: Joi.number().default(30),
+  AUDIT_LOG_RETENTION_DAYS: Joi.number().default(90),
+  TEMP_FILE_RETENTION_HOURS: Joi.number().default(24),
 });
