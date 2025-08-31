@@ -4,6 +4,8 @@ import { ThrottlerModule } from "@nestjs/throttler";
 import { JwtModule } from "@nestjs/jwt";
 import { WorkflowWebSocketGateway } from "./workflow-websocket.gateway";
 import { WebSocketService } from "./websocket.service";
+import { WebSocketAuthGuard } from "./guards/websocket-auth.guard";
+import { WebSocketLoggingInterceptor } from "./interceptors/websocket-logging.interceptor";
 import { WorkflowsModule } from "../domains/workflows/workflows.module";
 import { ExecutionsModule } from "../domains/executions/executions.module";
 import { AuthModule } from "../domains/auth/auth.module";
@@ -40,7 +42,7 @@ import { AuthModule } from "../domains/auth/auth.module";
     ExecutionsModule,
     AuthModule,
   ],
-  providers: [WorkflowWebSocketGateway, WebSocketService],
+  providers: [WorkflowWebSocketGateway, WebSocketService, WebSocketAuthGuard, WebSocketLoggingInterceptor],
   exports: [WorkflowWebSocketGateway, WebSocketService],
 })
 export class WebSocketModule {}
