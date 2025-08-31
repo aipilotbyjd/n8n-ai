@@ -5,10 +5,27 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-} from "@nestjs/common";
-import { Request, Response } from "express";
-import { QueryFailedError } from "typeorm";
-import { trace } from "@opentelemetry/api";
+} from '@nestjs/common';
+import { Request, Response } from 'express';
+import { 
+  BaseAppError, 
+  ErrorFactory, 
+  ErrorResponse, 
+  ErrorCategory, 
+  ErrorSeverity,
+  isAppError,
+  isValidationError,
+  isAuthenticationError,
+  isAuthorizationError,
+  isResourceNotFoundError,
+  isWorkflowError,
+  isDatabaseError,
+  isExternalServiceError,
+  isRateLimitError,
+  isBusinessRuleError,
+} from '@n8n-work/shared';
+import { ZodError } from 'zod';
+import { QueryFailedError, EntityNotFoundError } from 'typeorm';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -19,120 +36,325 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const span = trace.getActiveSpan();
-
-    let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = "Internal server error";
-    let code = "INTERNAL_ERROR";
-    let details: any = undefined;
-
-    // Handle different types of exceptions
-    if (exception instanceof HttpException) {
-      status = exception.getStatus();
-      const exceptionResponse = exception.getResponse();
-
-      if (typeof exceptionResponse === "string") {
-        message = exceptionResponse;
-      } else if (typeof exceptionResponse === "object") {
-        const responseObj = exceptionResponse as any;
-        message = responseObj.message || responseObj.error || exception.message;
-        code = responseObj.code || this.getErrorCodeFromStatus(status);
-        details = responseObj.details;
-      }
-    } else if (exception instanceof QueryFailedError) {
-      status = HttpStatus.BAD_REQUEST;
-      message = "Database query failed";
-      code = "DATABASE_ERROR";
-
-      // Don't expose sensitive database information in production
-      if (process.env.NODE_ENV !== "production") {
-        details = {
-          query: exception.query,
-          parameters: exception.parameters,
-          driverError: exception.driverError?.message,
-        };
-      }
-    } else if (exception instanceof Error) {
-      message = exception.message;
-      code = exception.name || "UNKNOWN_ERROR";
-
-      if (process.env.NODE_ENV !== "production") {
-        details = {
-          stack: exception.stack,
-        };
-      }
-    }
-
-    // Extract trace information
-    const traceId = span?.spanContext().traceId;
-    const spanId = span?.spanContext().spanId;
+    const correlationId = this.getCorrelationId(request);
+    const errorResponse = this.handleException(exception, request, correlationId);
 
     // Log the error
-    const errorLog = {
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      method: request.method,
-      statusCode: status,
-      message,
-      code,
-      traceId,
-      spanId,
-      userAgent: request.get("user-agent"),
-      ip: request.ip,
-      userId: (request as any).user?.id,
-      tenantId: (request as any).user?.tenantId,
-    };
+    this.logError(exception, request, correlationId, errorResponse);
 
-    // Log error with appropriate level
-    if (status >= 500) {
-      this.logger.error("Server error occurred", {
-        ...errorLog,
-        error: exception,
-        stack: exception instanceof Error ? exception.stack : undefined,
-      });
+    // Send the response
+    response.status(errorResponse.error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR);
+    response.json(errorResponse);
+  }
 
-      // Record span error
-      span?.recordException(
-        exception instanceof Error ? exception : new Error(String(exception)),
-      );
-      span?.setStatus({ code: 2, message }); // ERROR
-    } else if (status >= 400) {
-      this.logger.warn("Client error occurred", errorLog);
+  private handleException(
+    exception: unknown,
+    request: Request,
+    correlationId: string
+  ): ErrorResponse {
+    // Handle our custom app errors
+    if (isAppError(exception)) {
+      return this.handleAppError(exception, request, correlationId);
     }
 
-    // Prepare response
-    const errorResponse = {
-      success: false,
+    // Handle NestJS HTTP exceptions
+    if (exception instanceof HttpException) {
+      return this.handleHttpException(exception, request, correlationId);
+    }
+
+    // Handle Zod validation errors
+    if (exception instanceof ZodError) {
+      return this.handleZodError(exception, request, correlationId);
+    }
+
+    // Handle TypeORM errors
+    if (exception instanceof QueryFailedError) {
+      return this.handleDatabaseError(exception, request, correlationId);
+    }
+
+    if (exception instanceof EntityNotFoundError) {
+      return this.handleEntityNotFoundError(exception, request, correlationId);
+    }
+
+    // Handle unknown errors
+    return this.handleUnknownError(exception, request, correlationId);
+  }
+
+  private handleAppError(
+    error: BaseAppError,
+    request: Request,
+    correlationId: string
+  ): ErrorResponse {
+    const errorResponse: ErrorResponse = {
       error: {
-        code,
-        message,
-        statusCode: status,
-        timestamp: new Date().toISOString(),
-        path: request.url,
-        traceId,
-        ...(details && { details }),
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        category: error.category,
+        severity: error.severity,
+        timestamp: error.timestamp.toISOString(),
+        correlationId: correlationId,
+        requestId: correlationId,
+      },
+      meta: {
+        version: process.env.APP_VERSION || '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        service: 'orchestrator',
       },
     };
 
-    // Set status and send response
-    response.status(status).json(errorResponse);
+    // Add retry information for rate limit errors
+    if (isRateLimitError(error)) {
+      errorResponse.error.retryAfter = error.details?.retryAfter as number;
+    }
+
+    return errorResponse;
   }
 
-  private getErrorCodeFromStatus(status: number): string {
-    const statusCodeMap: Record<number, string> = {
-      400: "BAD_REQUEST",
-      401: "UNAUTHORIZED",
-      403: "FORBIDDEN",
-      404: "NOT_FOUND",
-      409: "CONFLICT",
-      422: "VALIDATION_ERROR",
-      429: "RATE_LIMIT_EXCEEDED",
-      500: "INTERNAL_ERROR",
-      502: "BAD_GATEWAY",
-      503: "SERVICE_UNAVAILABLE",
-      504: "GATEWAY_TIMEOUT",
+  private handleHttpException(
+    exception: HttpException,
+    request: Request,
+    correlationId: string
+  ): ErrorResponse {
+    const status = exception.getStatus();
+    const response = exception.getResponse() as any;
+
+    let errorCode = 'HTTP_EXCEPTION';
+    let category = ErrorCategory.SYSTEM;
+    let severity = ErrorSeverity.MEDIUM;
+
+    // Map HTTP status codes to our error categories
+    if (status >= 400 && status < 500) {
+      category = ErrorCategory.VALIDATION;
+      severity = ErrorSeverity.LOW;
+      
+      if (status === 401) {
+        errorCode = 'UNAUTHORIZED';
+        category = ErrorCategory.AUTHENTICATION;
+      } else if (status === 403) {
+        errorCode = 'FORBIDDEN';
+        category = ErrorCategory.AUTHORIZATION;
+      } else if (status === 404) {
+        errorCode = 'RESOURCE_NOT_FOUND';
+        category = ErrorCategory.RESOURCE;
+      } else if (status === 409) {
+        errorCode = 'RESOURCE_CONFLICT';
+        category = ErrorCategory.RESOURCE;
+      } else if (status === 429) {
+        errorCode = 'RATE_LIMIT_EXCEEDED';
+        category = ErrorCategory.RATE_LIMITING;
+      }
+    } else if (status >= 500) {
+      category = ErrorCategory.SYSTEM;
+      severity = ErrorSeverity.HIGH;
+    }
+
+    return {
+      error: {
+        code: errorCode,
+        message: response?.message || exception.message || 'HTTP Exception',
+        details: response?.error || response,
+        category,
+        severity,
+        timestamp: new Date().toISOString(),
+        correlationId,
+        requestId: correlationId,
+      },
+      meta: {
+        version: process.env.APP_VERSION || '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        service: 'orchestrator',
+      },
+    };
+  }
+
+  private handleZodError(
+    error: ZodError,
+    request: Request,
+    correlationId: string
+  ): ErrorResponse {
+    const details = error.errors.map(err => ({
+      field: err.path.join('.'),
+      message: err.message,
+      code: err.code,
+    }));
+
+    return {
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed',
+        details: { errors: details },
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.LOW,
+        timestamp: new Date().toISOString(),
+        correlationId,
+        requestId: correlationId,
+      },
+      meta: {
+        version: process.env.APP_VERSION || '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        service: 'orchestrator',
+      },
+    };
+  }
+
+  private handleDatabaseError(
+    error: QueryFailedError,
+    request: Request,
+    correlationId: string
+  ): ErrorResponse {
+    let message = 'Database operation failed';
+    let details = {};
+
+    // Handle specific database errors
+    if (error.message.includes('duplicate key')) {
+      message = 'Resource already exists';
+      details = { constraint: error.message };
+    } else if (error.message.includes('foreign key')) {
+      message = 'Referenced resource not found';
+      details = { constraint: error.message };
+    } else if (error.message.includes('not null')) {
+      message = 'Required field is missing';
+      details = { constraint: error.message };
+    }
+
+    return {
+      error: {
+        code: 'DATABASE_ERROR',
+        message,
+        details,
+        category: ErrorCategory.DATABASE,
+        severity: ErrorSeverity.HIGH,
+        timestamp: new Date().toISOString(),
+        correlationId,
+        requestId: correlationId,
+      },
+      meta: {
+        version: process.env.APP_VERSION || '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        service: 'orchestrator',
+      },
+    };
+  }
+
+  private handleEntityNotFoundError(
+    error: EntityNotFoundError,
+    request: Request,
+    correlationId: string
+  ): ErrorResponse {
+    return {
+      error: {
+        code: 'RESOURCE_NOT_FOUND',
+        message: 'Resource not found',
+        details: { entity: error.message },
+        category: ErrorCategory.RESOURCE,
+        severity: ErrorSeverity.LOW,
+        timestamp: new Date().toISOString(),
+        correlationId,
+        requestId: correlationId,
+      },
+      meta: {
+        version: process.env.APP_VERSION || '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        service: 'orchestrator',
+      },
+    };
+  }
+
+  private handleUnknownError(
+    error: unknown,
+    request: Request,
+    correlationId: string
+  ): ErrorResponse {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const stack = error instanceof Error ? error.stack : undefined;
+
+    return {
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? { stack } : undefined,
+        category: ErrorCategory.SYSTEM,
+        severity: ErrorSeverity.CRITICAL,
+        timestamp: new Date().toISOString(),
+        correlationId,
+        requestId: correlationId,
+      },
+      meta: {
+        version: process.env.APP_VERSION || '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        service: 'orchestrator',
+      },
+    };
+  }
+
+  private getCorrelationId(request: Request): string {
+    return (
+      request.headers['x-correlation-id'] as string ||
+      request.headers['x-request-id'] as string ||
+      `corr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    );
+  }
+
+  private logError(
+    exception: unknown,
+    request: Request,
+    correlationId: string,
+    errorResponse: ErrorResponse
+  ): void {
+    const logContext = {
+      correlationId,
+      method: request.method,
+      url: request.url,
+      userAgent: request.headers['user-agent'],
+      ip: request.ip,
+      userId: request.headers['x-user-id'],
+      tenantId: request.headers['x-tenant-id'],
     };
 
-    return statusCodeMap[status] || "UNKNOWN_ERROR";
+    const errorDetails = {
+      error: errorResponse.error,
+      context: logContext,
+    };
+
+    // Log based on severity
+    switch (errorResponse.error.severity) {
+      case ErrorSeverity.LOW:
+        this.logger.warn('Request failed with low severity error', errorDetails);
+        break;
+      case ErrorSeverity.MEDIUM:
+        this.logger.error('Request failed with medium severity error', errorDetails);
+        break;
+      case ErrorSeverity.HIGH:
+        this.logger.error('Request failed with high severity error', errorDetails);
+        break;
+      case ErrorSeverity.CRITICAL:
+        this.logger.fatal('Request failed with critical error', errorDetails);
+        break;
+      default:
+        this.logger.error('Request failed', errorDetails);
+    }
+
+    // Additional logging for specific error types
+    if (isDatabaseError(exception)) {
+      this.logger.error('Database error occurred', {
+        ...errorDetails,
+        originalError: exception,
+      });
+    }
+
+    if (isExternalServiceError(exception)) {
+      this.logger.error('External service error occurred', {
+        ...errorDetails,
+        originalError: exception,
+      });
+    }
+
+    if (isWorkflowError(exception)) {
+      this.logger.error('Workflow error occurred', {
+        ...errorDetails,
+        originalError: exception,
+      });
+    }
   }
 }
