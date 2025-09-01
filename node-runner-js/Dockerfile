@@ -22,8 +22,8 @@ FROM node:18-alpine AS development
 
 ARG PORT=3002
 
-# Install dumb-init and curl for health checks
-RUN apk add --no-cache dumb-init curl
+# Install dumb-init, curl, and Python for node-gyp
+RUN apk add --no-cache dumb-init curl python3 py3-pip build-base
 
 # Set working directory
 WORKDIR /app
@@ -46,8 +46,8 @@ FROM node:18-alpine AS production
 
 ARG PORT=3002
 
-# Install dumb-init for signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init and Python for signal handling and native modules
+RUN apk add --no-cache dumb-init python3 py3-pip build-base
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
