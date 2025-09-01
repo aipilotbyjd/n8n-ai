@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -18,7 +18,7 @@ COPY src/ src/
 RUN npm run build
 
 # Development stage
-FROM node:18-alpine AS development
+FROM node:22-alpine AS development
 
 ARG PORT=3002
 
@@ -42,7 +42,7 @@ EXPOSE ${PORT}
 CMD ["npm", "run", "start:dev"]
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:22-alpine AS production
 
 ARG PORT=3002
 
