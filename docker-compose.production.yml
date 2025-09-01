@@ -1,0 +1,459 @@
+# 🚀 Production-Ready Ultra-Scalable N8N Clone
+version: '3.8'
+
+services:
+  # PostgreSQL with High Availability
+  postgres-primary:
+    image: postgres:15-alpine
+    container_name: n8n-postgres-primary
+    environment:
+      POSTGRES_DB: n8n_production
+      POSTGRES_USER: ${POSTGRES_USER:-n8n_prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_MULTIPLE_DATABASES: orchestrator,engine,analytics
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - n8n-production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+
+  postgres-replica:
+    image: postgres:15-alpine
+    container_name: n8n-postgres-replica
+    environment:
+      POSTGRES_DB: n8n_production
+      POSTGRES_USER: ${POSTGRES_USER:-n8n_prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+    networks:
+      - n8n-production
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+  # Redis Cluster for Ultra-High Performance
+  redis-cluster:
+    image: redis:7-alpine
+    container_name: n8n-redis-cluster
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --maxmemory 4gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_cluster_data:/data
+    ports:
+      - "7001-7006:6379"
+    networks:
+      - n8n-production
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      replicas: 6
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+
+  # RabbitMQ Cluster with High Availability
+  rabbitmq-cluster:
+    image: rabbitmq:3-management-alpine
+    container_name: n8n-rabbitmq-cluster
+    environment:
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-n8n_prod_cluster_cookie}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-n8n_prod}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: /n8n-production
+    volumes:
+      - rabbitmq_cluster_data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - n8n-production
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+  # MinIO for Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: n8n-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - n8n-production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+  # ClickHouse for Analytics
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: n8n-clickhouse
+    environment:
+      CLICKHOUSE_DB: analytics
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-analytics}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-analytics_prod}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./infra/clickhouse/config.xml:/etc/clickhouse-server/config.xml:ro
+    ports:
+      - "8123:8123"
+      - "9009:9000"
+    networks:
+      - n8n-production
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '2.0'
+
+  # Jaeger for Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: n8n-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+      SPAN_STORAGE_TYPE: memory
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - n8n-production
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+
+  # Prometheus for Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: n8n-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - prometheus_data:/prometheus
+      - ./infra/prometheus:/etc/prometheus:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - n8n-production
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+  # Grafana for Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: n8n-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3002:3000"
+    networks:
+      - n8n-production
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+
+  # Nginx Load Balancer with Advanced Features
+  nginx:
+    image: nginx:alpine
+    container_name: n8n-nginx
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/ssl:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - n8n-production
+    depends_on:
+      - orchestrator-nest
+      - grafana
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # HashiCorp Vault for Secrets Management
+  vault:
+    image: hashicorp/vault:latest
+    container_name: n8n-vault
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_ROOT_TOKEN}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    volumes:
+      - vault_data:/vault/data
+      - ./infra/vault/config.hcl:/vault/config/config.hcl:ro
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - n8n-production
+    command: ["vault", "server", "-dev", "-dev-listen-address=0.0.0.0:8200"]
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # Orchestrator Service - Auto-Scaling Enabled
+  orchestrator-nest:
+    build:
+      context: ./orchestrator-nest
+      dockerfile: Dockerfile
+      target: production
+    container_name: n8n-orchestrator
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      GRPC_PORT: 50051
+      DATABASE_URL: postgresql://${POSTGRES_USER:-n8n_prod}:${POSTGRES_PASSWORD}@postgres-primary:5432/orchestrator
+      REDIS_URL: redis://redis-cluster:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-n8n_prod}:${RABBITMQ_PASSWORD}@rabbitmq-cluster:5672/n8n-production
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      EXECUTION_MAX_CONCURRENCY: 50
+      NODE_EXECUTION_TIMEOUT: 300000
+      NODE_MAX_RETRIES: 3
+      DB_USE_READ_REPLICAS: 'true'
+    volumes:
+      - ./orchestrator-nest:/app
+      - /app/node_modules
+      - ./proto-contracts:/app/proto-contracts
+    ports:
+      - "3003:3000"
+      - "50051:50051"
+    networks:
+      - n8n-production
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-cluster:
+        condition: service_healthy
+      rabbitmq-cluster:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+
+  # Engine Service - Auto-Scaling with Parallel Processing
+  engine-nest:
+    build:
+      context: ./engine-nest
+      dockerfile: Dockerfile
+      target: production
+    container_name: n8n-engine
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      GRPC_PORT: 50052
+      DATABASE_URL: postgresql://${POSTGRES_USER:-n8n_prod}:${POSTGRES_PASSWORD}@postgres-primary:5432/engine
+      REDIS_URL: redis://redis-cluster:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-n8n_prod}:${RABBITMQ_PASSWORD}@rabbitmq-cluster:5672/n8n-production
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      EXECUTION_MAX_CONCURRENCY: 100
+      NODE_EXECUTION_TIMEOUT: 180000
+      NODE_MAX_RETRIES: 3
+      RABBITMQ_PREFETCH_COUNT: 50
+    volumes:
+      - ./engine-nest:/app
+      - /app/node_modules
+      - ./proto-contracts:/app/proto-contracts
+      - engine_plugins:/app/plugins
+      - engine_temp:/tmp/n8n-production
+    ports:
+      - "3001:3001"
+      - "50052:50052"
+    networks:
+      - n8n-production
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-cluster:
+        condition: service_healthy
+      rabbitmq-cluster:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 5
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+      restart_policy:
+        condition: on-failure
+
+  # Node Runner Service - High Concurrency Execution
+  node-runner-js:
+    build:
+      context: ./node-runner-js
+      dockerfile: Dockerfile
+      target: production
+    container_name: n8n-node-runner
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DATABASE_URL: postgresql://${POSTGRES_USER:-n8n_prod}:${POSTGRES_PASSWORD}@postgres-primary:5432/engine
+      REDIS_URL: redis://redis-cluster:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-n8n_prod}:${RABBITMQ_PASSWORD}@rabbitmq-cluster:5672/n8n-production
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      RABBITMQ_PREFETCH_COUNT: 100
+    volumes:
+      - ./node-runner-js:/app
+      - /app/node_modules
+      - ./contracts:/app/contracts
+      - ./proto-contracts:/app/proto-contracts
+    ports:
+      - "3002:3002"
+    networks:
+      - n8n-production
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-cluster:
+        condition: service_healthy
+      rabbitmq-cluster:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 10
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  postgres_primary_data:
+  postgres_replica_data:
+  redis_cluster_data:
+  rabbitmq_cluster_data:
+  clickhouse_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+  vault_data:
+  engine_plugins:
+  engine_temp:
+
+networks:
+  n8n-production:
+    driver: overlay
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

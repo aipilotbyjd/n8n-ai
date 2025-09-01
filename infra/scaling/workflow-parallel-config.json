@@ -1,0 +1,34 @@
+{
+  "parallelExecution": {
+    "enabled": true,
+    "maxConcurrentNodes": 50,
+    "nodeExecutionTimeout": 300000,
+    "batchSize": 10,
+    "retryPolicy": {
+      "maxRetries": 3,
+      "backoffMultiplier": 2,
+      "initialDelay": 1000
+    }
+  },
+  "resourceManagement": {
+    "cpuThreshold": 80,
+    "memoryThreshold": 85,
+    "maxWorkflowsPerInstance": 100,
+    "instanceScaling": {
+      "minInstances": 3,
+      "maxInstances": 20,
+      "scaleUpThreshold": 75,
+      "scaleDownThreshold": 30
+    }
+  },
+  "circuitBreaker": {
+    "failureThreshold": 5,
+    "recoveryTimeout": 60000,
+    "monitoringPeriod": 30000
+  },
+  "loadBalancing": {
+    "strategy": "least-loaded",
+    "healthCheckInterval": 30000,
+    "unhealthyThreshold": 3
+  }
+}

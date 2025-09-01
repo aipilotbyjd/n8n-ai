@@ -27,7 +27,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: n8n-ai-redis
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru --tcp-keepalive 300 --timeout 300
     volumes:
       - redis_data:/data
       - ./infra/redis/redis.conf:/usr/local/etc/redis/redis.conf

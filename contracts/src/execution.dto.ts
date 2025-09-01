@@ -63,3 +63,32 @@ export interface NodeExecutionResponse {
   error?: string;
   metadata?: Record<string, any>;
 }
+
+export interface NodeExecutionResult {
+  nodeId: string;
+  status: 'completed' | 'failed' | 'pending' | 'running';
+  output?: any;
+  error?: string;
+  startedAt: Date;
+  finishedAt?: Date;
+  retryCount: number;
+  dependencies: string[];
+  dependents: string[];
+}
+
+export interface ExecutionBatch {
+  executionId: string;
+  nodes: string[];
+  maxConcurrency: number;
+  timeout: number;
+}
+
+export interface ExecutionMetrics {
+  totalNodes: number;
+  completedNodes: number;
+  failedNodes: number;
+  runningNodes: number;
+  averageExecutionTime: number;
+  totalExecutionTime: number;
+  parallelizationEfficiency: number;
+}

@@ -1,0 +1,141 @@
+# Ultra-Scalable Docker Compose Configuration
+version: '3.8'
+
+services:
+  # Redis Cluster for High Availability
+  redis-cluster:
+    image: redis:7-alpine
+    deploy:
+      replicas: 6
+      restart_policy:
+        condition: on-failure
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --maxmemory 2gb
+    volumes:
+      - redis_cluster_data:/data
+    networks:
+      - n8n-ai
+    depends_on:
+      - redis-sentinel
+
+  redis-sentinel:
+    image: redis:7-alpine
+    command: redis-sentinel /etc/redis/sentinel.conf
+    volumes:
+      - ./infra/redis/sentinel.conf:/etc/redis/sentinel.conf
+    networks:
+      - n8n-ai
+
+  # RabbitMQ Cluster
+  rabbitmq-cluster:
+    image: rabbitmq:3-management-alpine
+    deploy:
+      replicas: 3
+    environment:
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-n8n_ai_cluster}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_cluster_data:/var/lib/rabbitmq
+    networks:
+      - n8n-ai
+
+  # PostgreSQL with Read Replicas
+  postgres-primary:
+    image: postgres:15-alpine
+    deploy:
+      replicas: 1
+    environment:
+      POSTGRES_DB: n8n_ai
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+    networks:
+      - n8n-ai
+
+  postgres-replica:
+    image: postgres:15-alpine
+    deploy:
+      replicas: 2
+    environment:
+      POSTGRES_DB: n8n_ai
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+    networks:
+      - n8n-ai
+    depends_on:
+      - postgres-primary
+
+  # Orchestrator with Auto-scaling
+  orchestrator-nest:
+    build:
+      context: ./orchestrator-nest
+      target: production
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-primary:5432/n8n_ai
+      REDIS_URL: redis://redis-cluster:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq-cluster:5672
+    networks:
+      - n8n-ai
+
+  # Engine with Auto-scaling
+  engine-nest:
+    build:
+      context: ./engine-nest
+      target: production
+    deploy:
+      replicas: 5
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    environment:
+      NODE_ENV: production
+    networks:
+      - n8n-ai
+
+  # Node Runner with Auto-scaling
+  node-runner-js:
+    build:
+      context: ./node-runner-js
+      target: production
+    deploy:
+      replicas: 10
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      NODE_ENV: production
+    networks:
+      - n8n-ai
+
+volumes:
+  redis_cluster_data:
+  rabbitmq_cluster_data:
+  postgres_primary_data:
+  postgres_replica_data:
+
+networks:
+  n8n-ai:
+    driver: overlay

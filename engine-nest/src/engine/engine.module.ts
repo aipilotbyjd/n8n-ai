@@ -20,8 +20,23 @@ import { redisStore } from 'cache-manager-redis-store';
             urls: [configService.get<string>('rabbitmq.uri') || 'amqp://localhost:5672'],
             queue: configService.get<string>('rabbitmq.queues.nodeExecution') || 'node-execution',
             queueOptions: {
-              durable: false,
+              durable: true,  // Make queue durable for persistence
+              arguments: {
+                'x-max-retries': 5,  // Maximum retry attempts
+                'x-message-ttl': 86400000,  // 24 hours TTL for messages
+                'x-dead-letter-exchange': 'node-execution-dlx',  // Dead letter exchange
+                'x-dead-letter-routing-key': 'node-execution-dlq',  // Dead letter routing key
+              },
             },
+            socketOptions: {
+              heartbeatIntervalInSeconds: 60,
+              reconnectTimeInSeconds: 5,
+              connectionOptions: {
+                timeout: 10000,
+              },
+            },
+            prefetchCount: parseInt(process.env.RABBITMQ_PREFETCH_COUNT || '10'), // Control concurrency per consumer
+            noAck: false,  // Require explicit acknowledgment
           },
         }),
         inject: [ConfigService],

@@ -13,11 +13,11 @@ import { Logger, UseGuards, UseFilters, UsePipes, ValidationPipe, UseInterceptor
 import { WsExceptionFilter } from "../common/filters/ws-exception.filter";
 import { WebSocketAuthGuard, AuthenticatedSocket } from "./guards/websocket-auth.guard";
 import { WebSocketLoggingInterceptor } from "./interceptors/websocket-logging.interceptor";
-import { 
-  SubscriptionRequestDto, 
-  UnsubscribeRequestDto, 
+import {
+  SubscriptionRequestDto,
+  UnsubscribeRequestDto,
   StatusRequestDto,
-  PingMessageDto 
+  PingMessageDto
 } from "./dto/websocket.dto";
 import { WorkflowsService } from "../domains/workflows/workflows.service";
 import { ExecutionsService } from "../domains/executions/executions.service";
@@ -28,8 +28,16 @@ import { AuthUser } from "../auth/interfaces/auth-user.interface";
 import { WebSocketService } from "./websocket.service";
 import { ConfigService } from "@nestjs/config";
 
-interface WorkflowAuthenticatedSocket extends AuthenticatedSocket {
+// Fix the type definition to properly extend Socket.IO Socket
+interface WorkflowAuthenticatedSocket extends Socket {
+  userId: string;
+  tenantId: string;
+  user?: any;
   subscriptions?: Set<string>;
+
+  // Explicitly declare Socket.IO methods to ensure TypeScript recognizes them
+  emit(event: string, ...args: any[]): boolean;
+  disconnect(close?: boolean): this;
 }
 
 interface SubscriptionRequest {

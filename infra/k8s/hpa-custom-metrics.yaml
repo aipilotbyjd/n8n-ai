@@ -1,0 +1,297 @@
+# Advanced Horizontal Pod Autoscaling with Custom Metrics
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: orchestrator-hpa-advanced
+  namespace: n8n-work
+  labels:
+    app: orchestrator-nest
+    component: autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: orchestrator-nest
+  minReplicas: 3
+  maxReplicas: 50
+  metrics:
+  # CPU utilization
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Memory utilization  
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Custom metrics for workflow orchestration
+  - type: Pods
+    pods:
+      metric:
+        name: workflows_active
+      target:
+        type: AverageValue
+        averageValue: 100  # Scale up if average active workflows > 100 per pod
+  - type: Pods
+    pods:
+      metric:
+        name: queue_depth
+      target:
+        type: AverageValue
+        averageValue: 500  # Scale up if average queue depth > 500 per pod
+  - type: Pods
+    pods:
+      metric:
+        name: response_time_p95
+      target:
+        type: AverageValue
+        averageValue: 2000ms  # Scale up if 95th percentile response time > 2s
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 60
+      - type: Pods
+        value: 5
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 10
+        periodSeconds: 60
+      selectPolicy: Max
+---
+# Engine HPA with workflow execution metrics
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: engine-hpa-advanced
+  namespace: n8n-work
+  labels:
+    app: engine-nest
+    component: autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: engine-nest
+  minReplicas: 5
+  maxReplicas: 100
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  - type: Pods
+    pods:
+      metric:
+        name: node_executions_active
+      target:
+        type: AverageValue
+        averageValue: 200  # Scale up if average active node executions > 200 per pod
+  - type: Pods
+    pods:
+      metric:
+        name: node_queue_depth
+      target:
+        type: AverageValue
+        averageValue: 1000  # Scale up if average node queue depth > 1000 per pod
+  - type: Pods
+    pods:
+      metric:
+        name: execution_errors_rate
+      target:
+        type: AverageValue
+        averageValue: 5  # Scale up if error rate > 5% per pod
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 30
+        periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 200
+        periodSeconds: 30
+      - type: Pods
+        value: 20
+        periodSeconds: 30
+---
+# Node Runner HPA with execution metrics
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: node-runner-hpa-advanced
+  namespace: n8n-work
+  labels:
+    app: node-runner-js
+    component: autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: node-runner-js
+  minReplicas: 10
+  maxReplicas: 200
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 90
+  - type: Pods
+    pods:
+      metric:
+        name: node_execution_time_p95
+      target:
+        type: AverageValue
+        averageValue: 5000ms  # Scale up if 95th percentile execution time > 5s
+  - type: Pods
+    pods:
+      metric:
+        name: node_failure_rate
+      target:
+        type: AverageValue
+        averageValue: 3  # Scale up if failure rate > 3% per pod
+  - type: Pods
+    pods:
+      metric:
+        name: concurrent_executions
+      target:
+        type: AverageValue
+        averageValue: 50  # Scale up if concurrent executions > 50 per pod
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 900
+      policies:
+      - type: Percent
+        value: 40
+        periodSeconds: 180
+    scaleUp:
+      stabilizationWindowSeconds: 15
+      policies:
+      - type: Percent
+        value: 300
+        periodSeconds: 15
+      - type: Pods
+        value: 30
+        periodSeconds: 15
+---
+# Service Monitor for custom metrics collection
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: n8n-work-servicemonitor
+  namespace: n8n-work
+  labels:
+    app: n8n-work
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: orchestrator-nest
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+  - port: grpc
+    path: /metrics/grpc
+    interval: 30s
+    scrapeTimeout: 15s
+---
+# Prometheus Rules for alerting and recording rules
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: n8n-work-alerts
+  namespace: n8n-work
+  labels:
+    app: n8n-work
+    component: alerting
+spec:
+  groups:
+  - name: n8n-work
+    rules:
+    # High queue depth alerts
+    - alert: HighQueueDepth
+      expr: sum(workflow_queue_depth) > 1000
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High workflow queue depth"
+        description: "Workflow queue depth is {{ $value }} which is above threshold"
+
+    # High error rate alerts  
+    - alert: HighErrorRate
+      expr: rate(workflow_execution_errors_total[5m]) / rate(workflow_executions_total[5m]) > 0.05
+      for: 3m
+      labels:
+        severity: critical
+      annotations:
+        summary: "High workflow error rate"
+        description: "Workflow error rate is {{ $value | humanizePercentage }}"
+
+    # Slow response time alerts
+    - alert: SlowResponseTime
+      expr: histogram_quantile(0.95, rate(workflow_execution_duration_bucket[5m])) > 10
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Slow workflow response time"
+        description: "95th percentile response time is {{ $value }}s"
+
+    # Resource saturation alerts
+    - alert: HighCPUUsage
+      expr: rate(container_cpu_usage_seconds_total{pod=~".*n8n.*"}[5m]) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage"
+        description: "CPU usage is above 80%"
+
+    # Recording rules for custom metrics
+    - record: workflow_queue_depth
+      expr: sum(prometheus_http_requests_in_flight) by (job)
+
+    - record: workflow_executions_total
+      expr: sum(rate(workflow_execution_total[5m])) by (job)
+
+    - record: workflow_execution_errors_total  
+      expr: sum(rate(workflow_execution_errors_total[5m])) by (job)
+
+    - record: workflow_execution_duration_bucket
+      expr: sum(rate(workflow_execution_duration_bucket[5m])) by (le, job)
