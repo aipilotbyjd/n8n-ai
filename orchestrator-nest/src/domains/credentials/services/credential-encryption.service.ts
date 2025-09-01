@@ -22,8 +22,8 @@ export class CredentialEncryptionService {
       // Generate random IV
       const iv = crypto.randomBytes(this.ivLength);
 
-      // Create cipher
-      const cipher = crypto.createCipher(this.algorithm, key);
+      // Create cipher with IV
+      const cipher = crypto.createCipherGCM(this.algorithm, key, iv);
       cipher.setAAD(Buffer.from(tenantId, "utf8"));
 
       // Encrypt data
@@ -57,8 +57,8 @@ export class CredentialEncryptionService {
       const dataBuffer = Buffer.from(encryptedData, "base64");
       const { iv, tag, encrypted } = JSON.parse(dataBuffer.toString("utf8"));
 
-      // Create decipher
-      const decipher = crypto.createDecipher(this.algorithm, key);
+      // Create decipher with IV
+      const decipher = crypto.createDecipherGCM(this.algorithm, key, Buffer.from(iv, "hex"));
       decipher.setAAD(Buffer.from(tenantId, "utf8"));
       decipher.setAuthTag(Buffer.from(tag, "hex"));
 

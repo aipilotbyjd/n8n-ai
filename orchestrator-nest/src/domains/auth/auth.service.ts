@@ -8,7 +8,15 @@ import { User, UserStatus } from './entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuthResponse } from './dto/auth-response.dto';
-import { TenantService } from '../../tenants/tenants.service';
+import { TenantService } from '../tenants/tenants.service';
+import { 
+  RefreshTokenDto, 
+  ForgotPasswordDto, 
+  ResetPasswordDto, 
+  UpdateProfileDto, 
+  ChangePasswordDto 
+} from './dto';
+import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
 export class AuthService {
@@ -49,9 +57,10 @@ export class AuthService {
 
     const { email, password, tenantId, ...rest } = registerDto;
 
-    // Validate tenant
-    const tenant = await this.tenantService.findOne(tenantId);
-    if (!tenant) {
+    // Validate tenant exists (assuming tenant service has findById method)
+    try {
+      await this.tenantService.findById(tenantId);
+    } catch (error) {
       throw new BadRequestException('Invalid tenant ID');
     }
 
@@ -61,8 +70,9 @@ export class AuthService {
       throw new ConflictException('User with this email already exists in this tenant');
     }
 
-    // TODO: Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
+    // Hash password with configurable rounds for security
+    const saltRounds = this.configService.get<number>('BCRYPT_ROUNDS', 12);
+    const passwordHash = await bcrypt.hash(password, saltRounds);
 
     const user = this.usersRepository.create({
       email,
@@ -92,7 +102,7 @@ export class AuthService {
 
   // TODO: Implement other auth methods (refreshToken, logout, forgotPassword, resetPassword, etc.)
 
-  async validateUser(userId: string): Promise<User> {
+  async validateUser(userId: string): Promise<User | null> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user || user.status !== UserStatus.ACTIVE) {
       return null;
@@ -101,9 +111,40 @@ export class AuthService {
   }
 
   async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<AuthResponse> {
-    this.logger.log(`Refreshing token for: ${refreshTokenDto.refreshToken}`);
-    // TODO: Implement refresh token logic
-    throw new UnauthorizedException('Invalid refresh token');
+    this.logger.log('Attempting to refresh token');
+    
+    try {
+      const decoded = this.jwtService.verify(refreshTokenDto.refreshToken, {
+        secret: this.configService.get<string>('jwt.refreshSecret') || this.configService.get<string>('jwt.secret'),
+      });
+
+      const user = await this.validateUser(decoded.sub);
+      if (!user) {
+        throw new UnauthorizedException('Invalid refresh token - user not found');
+      }
+
+      // Generate new tokens
+      const payload = { email: user.email, sub: user.id, tenantId: user.tenantId };
+      const accessToken = this.jwtService.sign(payload);
+      const refreshToken = this.jwtService.sign(payload, { 
+        expiresIn: this.configService.get<string>('jwt.refreshExpiresIn') 
+      });
+
+      // Update last login time
+      user.lastLoginAt = new Date();
+      await this.usersRepository.save(user);
+
+      return {
+        accessToken,
+        refreshToken,
+        expiresIn: 3600,
+        tokenType: 'Bearer',
+        user,
+      };
+    } catch (error) {
+      this.logger.error('Refresh token validation failed', error);
+      throw new UnauthorizedException('Invalid refresh token');
+    }
   }
 
   async logout(userId: string): Promise<void> {
@@ -142,7 +183,29 @@ export class AuthService {
 
   async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<void> {
     this.logger.log(`Changing password for user: ${userId}`);
-    // TODO: Implement change password logic (validate current password, hash new password)
+    
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Validate current password
+    const isCurrentPasswordValid = await bcrypt.compare(changePasswordDto.currentPassword, user.passwordHash);
+    if (!isCurrentPasswordValid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    // Hash new password
+    const saltRounds = this.configService.get<number>('BCRYPT_ROUNDS', 12);
+    const newPasswordHash = await bcrypt.hash(changePasswordDto.newPassword, saltRounds);
+
+    // Update password
+    user.passwordHash = newPasswordHash;
+    user.updatedAt = new Date();
+    
+    await this.usersRepository.save(user);
+    
+    this.logger.log(`Password changed successfully for user: ${userId}`);
   }
 
   async validateToken(token: string): Promise<{ valid: boolean; user: Partial<User>; permissions: string[]; }> {

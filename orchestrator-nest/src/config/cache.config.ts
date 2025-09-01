@@ -1,46 +1,32 @@
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { CacheModuleOptions, CacheOptionsFactory } from "@nestjs/cache-manager";
+import { registerAs } from '@nestjs/config';
 
-@Injectable()
-export class CacheConfig implements CacheOptionsFactory {
-  constructor(private readonly config: ConfigService) {}
-
-  async createCacheOptions(): Promise<CacheModuleOptions> {
-    const cacheConfig = this.config.get("cache") || {
-      driver: "memory",
-      redis: {
-        host: process.env.REDIS_HOST || "redis",
-        port: parseInt(process.env.REDIS_PORT || "6379"),
-        password: process.env.REDIS_PASSWORD,
-      },
-      ttl: 3600, // 1 hour in seconds
-      max: 1000,
-    };
-
-    if (cacheConfig.driver === "redis") {
-      try {
-        const { redisStore } = await import("cache-manager-redis-yet");
-        return {
-          store: redisStore,
-          host: cacheConfig.redis.host,
-          port: cacheConfig.redis.port,
-          password: cacheConfig.redis.password,
-          ttl: cacheConfig.ttl,
-          max: cacheConfig.max,
-        };
-      } catch (error) {
-        console.warn(
-          "Redis store not available, falling back to memory cache:",
-          error.message,
-        );
-      }
-    }
-
-    // Default to memory cache
+export default registerAs('cache', () => {
+  const isRedisEnabled = process.env.REDIS_URI || process.env.REDIS_HOST;
+  
+  if (isRedisEnabled) {
     return {
-      ttl: cacheConfig.ttl,
-      max: cacheConfig.max,
+      store: 'redis',
+      host: process.env.REDIS_HOST || 'redis',
+      port: parseInt(process.env.REDIS_PORT || '6379'),
+      password: process.env.REDIS_PASSWORD,
+      db: parseInt(process.env.REDIS_CACHE_DB || '0'),
+      ttl: parseInt(process.env.CACHE_TTL || '300'), // 5 minutes default
+      max: parseInt(process.env.CACHE_MAX_ITEMS || '1000'),
+      // Connection pool settings
+      family: 4, // IPv4
+      keepAlive: true,
+      connectTimeout: parseInt(process.env.REDIS_CONNECT_TIMEOUT || '10000'),
+      commandTimeout: parseInt(process.env.REDIS_COMMAND_TIMEOUT || '5000'),
+      retryDelayOnFailover: parseInt(process.env.REDIS_RETRY_DELAY || '100'),
+      maxRetriesPerRequest: parseInt(process.env.REDIS_MAX_RETRIES || '3'),
+      lazyConnect: true,
     };
   }
-}
+
+  // Default to memory cache
+  return {
+    store: 'memory',
+    ttl: parseInt(process.env.CACHE_TTL || '300'),
+    max: parseInt(process.env.CACHE_MAX_ITEMS || '1000'),
+  };
+});

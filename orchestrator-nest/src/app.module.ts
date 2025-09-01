@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { CacheModule } from '@nestjs/cache-manager';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ClientsModule, Transport } from '@nestjs/microservices';
@@ -172,8 +173,8 @@ import { HealthModule } from './health/health.module';
   providers: [
     AppService,
     {
-      provide: 'APP_GUARD',
-      useClass: ThrottlerModule,
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })
