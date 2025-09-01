@@ -4,6 +4,10 @@
   "description": "Shared utilities, types, and constants for N8N-Work platform",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
