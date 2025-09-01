@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -9,7 +9,7 @@ COPY package*.json ./
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
 
-# Install dependencies
+# Install dependencies with latest npm
 RUN npm ci --only=production && npm cache clean --force
 
 # Copy source code
@@ -19,7 +19,7 @@ COPY src/ src/
 RUN npm run build
 
 # Development stage
-FROM node:18-alpine AS development
+FROM node:22-alpine AS development
 
 ARG PORT=3000
 ARG GRPC_PORT=50051
@@ -45,7 +45,7 @@ EXPOSE ${PORT} ${GRPC_PORT}
 CMD ["npm", "run", "start:dev"]
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:22-alpine AS production
 
 ARG PORT=3000
 
