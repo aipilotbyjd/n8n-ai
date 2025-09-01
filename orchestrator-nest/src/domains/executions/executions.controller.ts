@@ -33,7 +33,7 @@ import { RetryExecutionDto } from "./dto/retry-execution.dto";
 import { ExecutionFilterDto } from "./dto/execution-filter.dto";
 import { ExecutionStatus } from "../common/enums/execution-status.enum";
 import { ExecutionMode } from "../common/enums/execution-mode.enum";
-import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { TenantGuard } from "../../common/guards/tenant.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Tenant } from "../../common/decorators/tenant.decorator";

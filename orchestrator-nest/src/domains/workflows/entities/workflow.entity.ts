@@ -10,9 +10,9 @@ import {
   JoinColumn,
 } from "typeorm";
 import { ApiProperty } from "@nestjs/swagger";
-import { Tenant } from "../../../tenants/entities/tenant.entity";
-import { User } from "../../../auth/entities/user.entity";
-import { Execution } from "../../../executions/entities/execution.entity";
+import { Tenant } from "../../tenants/entities/tenant.entity";
+import { User } from "../auth/entities/user.entity";
+import { Execution } from "../executions/entities/execution.entity";
 import { WorkflowConnectionDto } from "../dto/create-workflow.dto";
 
 export enum WorkflowStatus {

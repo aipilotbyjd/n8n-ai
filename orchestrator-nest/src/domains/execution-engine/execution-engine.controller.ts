@@ -16,7 +16,7 @@ import {
 import { ExecutionEngineService } from "./execution-engine.service";
 import { CreateExecutionEngineDto } from "./dto/create-execution-engine.dto";
 import { UpdateExecutionEngineDto } from "./dto/update-execution-engine.dto";
-import { AuthUser } from "../../auth/interfaces/auth-user.interface";
+import { AuthUser } from "../auth/interfaces/auth-user.interface";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Execution } from "./entities/execution-engine.entity";
 

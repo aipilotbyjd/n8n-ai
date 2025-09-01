@@ -24,7 +24,7 @@ import { ExecutionsService } from "../domains/executions/executions.service";
 import { EventEmitter2, OnEvent } from "@nestjs/event-emitter";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { JwtService } from "@nestjs/jwt";
-import { AuthUser } from "../auth/interfaces/auth-user.interface";
+import { AuthUser } from "../domains/auth/interfaces/auth-user.interface";
 import { WebSocketService } from "./websocket.service";
 import { ConfigService } from "@nestjs/config";
 

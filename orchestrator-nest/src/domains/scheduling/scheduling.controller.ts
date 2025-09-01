@@ -28,7 +28,7 @@ import {
   ApiNotFoundResponse,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
-import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { TenantGuard } from "../../common/guards/tenant.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Tenant } from "../../common/decorators/tenant.decorator";

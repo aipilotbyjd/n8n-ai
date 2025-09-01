@@ -3,81 +3,48 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-  BadRequestException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { Request } from "express";
-
-// Extend Request interface to include tenantId
-declare global {
-  namespace Express {
-    interface Request {
-      tenantId?: string;
-    }
-  }
-}
+import { Observable } from "rxjs";
 
 @Injectable()
 export class TenantGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<Request>();
-    const user = request.user as any;
+  canActivate(
+    context: ExecutionContext,
+  ): boolean | Promise<boolean> | Observable<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const user = request.user;
 
     if (!user) {
-      throw new ForbiddenException("User must be authenticated");
+      throw new ForbiddenException("User not authenticated");
     }
 
-    // Extract tenant ID from various sources
-    let tenantId: string | undefined;
-
-    // 1. Check URL parameter
-    tenantId = request.params.tenantId;
-
-    // 2. Check query parameter
-    if (!tenantId) {
-      tenantId = request.query.tenantId as string;
-    }
-
-    // 3. Check custom header
-    if (!tenantId) {
-      tenantId = request.headers["x-tenant-id"] as string;
-    }
-
-    // 4. Use user's default tenant
-    if (!tenantId && user.defaultTenantId) {
-      tenantId = user.defaultTenantId;
-    }
-
-    // 5. Use first tenant from user's tenant list
-    if (!tenantId && user.tenants && user.tenants.length > 0) {
-      tenantId = user.tenants[0].id || user.tenants[0];
-    }
+    // Extract tenant from request (can be from headers, params, or user object)
+    const tenantId = this.extractTenantId(request);
 
     if (!tenantId) {
-      throw new BadRequestException("Tenant ID is required");
+      throw new ForbiddenException("Tenant not specified");
     }
 
-    // Validate user has access to this tenant
-    if (!this.hasAccessToTenant(user, tenantId)) {
+    // Verify user has access to this tenant
+    if (user.tenantId && user.tenantId !== tenantId) {
       throw new ForbiddenException("Access denied to this tenant");
     }
 
-    // Attach tenant ID to request for use in controllers
-    request.tenantId = tenantId;
+    // Add tenant to request for easy access in controllers
+    request.tenant = { id: tenantId };
 
     return true;
   }
 
-  private hasAccessToTenant(user: any, tenantId: string): boolean {
-    if (!user.tenants) {
-      return false;
-    }
+  private extractTenantId(request: any): string | null {
+    // Try to get tenant from various sources
+    const tenantFromHeader = request.headers["x-tenant-id"];
+    const tenantFromQuery = request.query.tenantId;
+    const tenantFromUser = request.user?.tenantId;
 
-    // Check if user belongs to the tenant
-    return user.tenants.some((tenant: any) => {
-      return (typeof tenant === "string" ? tenant : tenant.id) === tenantId;
-    });
+    return tenantFromHeader || tenantFromQuery || tenantFromUser || null;
   }
 }

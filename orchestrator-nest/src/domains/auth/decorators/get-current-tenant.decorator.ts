@@ -1,8 +1,14 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { createParamDecorator, ExecutionContext } from "@nestjs/common";
 
 export const GetCurrentTenant = createParamDecorator(
-  (data: unknown, ctx: ExecutionContext) => {
+  (data: string | undefined, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
-    return request.tenantId;
+    const tenant = request.tenant;
+
+    if (!tenant) {
+      return null;
+    }
+
+    return data ? tenant[data] : tenant.id;
   },
 );

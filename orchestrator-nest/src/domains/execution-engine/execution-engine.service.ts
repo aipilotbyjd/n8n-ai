@@ -4,7 +4,7 @@ import { Repository } from "typeorm";
 import { Execution } from "./entities/execution-engine.entity";
 import { CreateExecutionEngineDto } from "./dto/create-execution-engine.dto";
 import { UpdateExecutionEngineDto } from "./dto/update-execution-engine.dto";
-import { AuthUser } from "../../auth/interfaces/auth-user.interface";
+import { AuthUser } from "../auth/interfaces/auth-user.interface";
 
 @Injectable()
 export class ExecutionEngineService {
