@@ -34,9 +34,13 @@ import { AuthModule } from "../domains/auth/auth.module";
       ttl: 60000, // Time to live in milliseconds
       limit: 100, // Maximum number of requests within TTL
     }]),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || "default-secret",
-      signOptions: { expiresIn: "24h" },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('jwt.secret'),
+        signOptions: { expiresIn: configService.get<string>('jwt.expiresIn') },
+      }),
+      inject: [ConfigService],
     }),
     WorkflowsModule,
     ExecutionsModule,

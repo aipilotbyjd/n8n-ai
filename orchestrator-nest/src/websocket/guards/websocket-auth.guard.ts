@@ -24,9 +24,7 @@ export class WebSocketAuthGuard implements CanActivate {
         throw new WsException('Authentication token required');
       }
 
-      const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_SECRET || 'default-secret',
-      });
+      const payload = await this.jwtService.verifyAsync(token);
 
       if (!payload || !payload.sub || !payload.tenantId) {
         throw new WsException('Invalid token payload');
