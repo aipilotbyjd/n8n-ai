@@ -1,13 +1,13 @@
-# N8N-Work: Production-Ready Workflow Automation Platform
+# N8N-AI: Production-Ready Workflow Automation Platform
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://github.com/n8n-work/platform/workflows/CI/badge.svg)](https://github.com/n8n-work/platform/actions)
-[![Docker](https://img.shields.io/badge/docker-supported-blue)](https://hub.docker.com/r/n8n-work/platform)
+[![Docker](https://img.shields.io/badge/docker-supported-blue)](https://www.docker.com/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-ready-green)](https://kubernetes.io/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue)](https://www.typescriptlang.org/)
 [![NestJS](https://img.shields.io/badge/NestJS-11.0+-red)](https://nestjs.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-22+-green)](https://nodejs.org/)
 
-N8N-Work is a **production-ready**, enterprise-grade workflow automation platform built with modern technologies and best practices. This improved version features enhanced architecture, comprehensive error handling, type safety, and scalability.
+N8N-AI is a **production-ready**, enterprise-grade workflow automation platform built with modern technologies and best practices. This enhanced version features AI-powered workflow automation, comprehensive error handling, type safety, and ultra-scalability.
 
 ## 🚀 Key Improvements
 
@@ -34,6 +34,15 @@ N8N-Work is a **production-ready**, enterprise-grade workflow automation platfor
 - **Code Quality**: ESLint, Prettier, and automated formatting
 - **Documentation**: Comprehensive API documentation
 - **Docker Support**: Containerized development environment
+
+### ✅ **AI & Advanced Features**
+- **AI Agent Integration**: Intelligent workflow automation
+- **WebSocket Support**: Real-time communication and updates
+- **Event Streaming**: Comprehensive event-driven architecture
+- **Analytics Dashboard**: ClickHouse-powered analytics
+- **Object Storage**: MinIO integration for file handling
+- **Monitoring Stack**: Prometheus, Grafana, and Jaeger tracing
+- **Load Balancing**: Nginx-based API gateway
 
 ## 🏗️ Architecture Overview
 
@@ -67,11 +76,13 @@ N8N-Work is a **production-ready**, enterprise-grade workflow automation platfor
 
 ## 📋 Prerequisites
 
-- **Node.js 18+** with npm or yarn
+- **Node.js 22+** with npm or yarn
 - **Docker & Docker Compose** for containerized development
 - **PostgreSQL 15+** (or use Docker)
 - **Redis 7+** (or use Docker)
 - **RabbitMQ 3+** (or use Docker)
+- **ClickHouse** for analytics (optional, or use Docker)
+- **MinIO** for object storage (optional, or use Docker)
 
 ## 🚀 Quick Start
 
@@ -79,8 +90,8 @@ N8N-Work is a **production-ready**, enterprise-grade workflow automation platfor
 
 ```bash
 # Clone the repository
-git clone https://github.com/n8n-work/platform.git
-cd platform
+git clone https://github.com/jaydeep-work/n8n-ai.git
+cd n8n-ai
 
 # Run initial setup
 make setup
@@ -108,8 +119,28 @@ make health
 make logs
 
 # Access the API
-curl http://localhost:3000/api/v1/health
+curl http://localhost:3003/api/v1/health
+
+# Check running services
+docker-compose ps
 ```
+
+### Service URLs
+
+When running in development mode, services are available at:
+
+- **Orchestrator API**: http://localhost:3003 (Main API Gateway)
+- **Engine API**: http://localhost:3001 (Workflow Engine)
+- **Node Runner**: http://localhost:3002 (Node Execution)
+- **PostgreSQL**: localhost:5432 (Database)
+- **Redis**: localhost:6379 (Cache)
+- **RabbitMQ Management**: http://localhost:15672 (Message Queue UI)
+- **ClickHouse**: http://localhost:8123 (Analytics DB)
+- **MinIO Console**: http://localhost:9001 (Object Storage UI)
+- **Prometheus**: http://localhost:9090 (Metrics)
+- **Grafana**: http://localhost:3002 (Dashboards)
+- **Jaeger**: http://localhost:16686 (Tracing)
+- **Nginx**: http://localhost:80 (Load Balancer)
 
 ## 🛠️ Development Commands
 
@@ -154,7 +185,7 @@ make clean-all             # Clean everything
 ## 📁 Project Structure
 
 ```
-n8n-work/
+n8n-ai/
 ├── shared/                    # Shared libraries and utilities
 │   ├── src/
 │   │   ├── types/            # Common TypeScript types
@@ -162,7 +193,7 @@ n8n-work/
 │   │   ├── constants/        # Shared constants
 │   │   └── validators/       # Validation schemas
 │   └── package.json
-├── orchestrator-nest/         # API Gateway & Workflow Management
+├── orchestrator-nest/         # API Gateway & Workflow Management (NestJS)
 │   ├── src/
 │   │   ├── domains/          # Business logic domains
 │   │   ├── common/           # Shared components
@@ -170,25 +201,34 @@ n8n-work/
 │   │   │   ├── guards/       # Authentication guards
 │   │   │   ├── interceptors/ # Request/response interceptors
 │   │   │   └── services/     # Base services
+│   │   ├── websocket/        # WebSocket support
+│   │   ├── observability/    # Monitoring & metrics
 │   │   └── main.ts
 │   └── package.json
-├── engine-nest/              # Workflow Execution Engine
+├── engine-nest/              # Workflow Execution Engine (NestJS)
 │   ├── src/
 │   │   ├── engine/           # Execution logic
 │   │   ├── dag/              # DAG processing
+│   │   ├── ai/               # AI integration
 │   │   └── main.ts
 │   └── package.json
-├── node-runner-js/           # Node Execution Service
+├── node-runner-js/           # Node Execution Service (Node.js)
 │   ├── src/
 │   │   ├── nodes/            # Node execution logic
 │   │   ├── sandbox/          # Code sandboxing
+│   │   ├── ai-agents/        # AI agent execution
 │   │   └── main.ts
 │   └── package.json
 ├── contracts/                # Shared contracts and DTOs
+├── proto-contracts/          # gRPC Protocol Buffers
 ├── infra/                    # Infrastructure configuration
+│   ├── k8s/                  # Kubernetes manifests
+│   ├── prometheus/           # Monitoring configuration
+│   ├── grafana/              # Dashboard configuration
+│   └── nginx/                # Load balancer configuration
 ├── docs/                     # Documentation
-├── tests/                    # Integration tests
 ├── docker-compose.yml        # Development environment
+├── docker-compose.production.yml # Production environment
 ├── Makefile                  # Development automation
 └── README.md
 ```
@@ -274,6 +314,89 @@ tests/
 ├── fixtures/                # Test data
 └── utils/                   # Test utilities
 ```
+
+## 🛠️ Troubleshooting
+
+### Common Issues
+
+#### Docker Build Issues
+
+**Problem**: DNS resolution errors when pulling Docker images (especially in WSL2)
+```
+failed to solve: node:22-alpine: failed to resolve source metadata
+```
+
+**Solutions**:
+1. **Check Docker Desktop Status**: Ensure Docker Desktop is running and properly integrated with WSL2
+2. **Restart Docker Desktop**: Stop and restart Docker Desktop completely
+3. **Use Existing Images**: If you have previously built images, use them without rebuilding:
+   ```bash
+   docker-compose up orchestrator-nest -d
+   ```
+4. **Alternative Base Images**: Switch from alpine to regular images if DNS issues persist
+5. **Network Issues**: Check your internet connection and corporate firewall settings
+
+#### WSL2 Docker Integration Issues
+
+**Problem**: Docker credential errors or WSL socket issues
+```
+error getting credentials - err: exit status 1
+```
+
+**Solutions**:
+1. **Restart WSL2**:
+   ```bash
+   wsl --shutdown
+   # Then restart your WSL2 terminal
+   ```
+2. **Reset Docker Credentials**:
+   ```bash
+   docker logout
+   ```
+3. **Check Docker Desktop WSL2 Integration**: Enable WSL2 integration in Docker Desktop settings
+
+#### Service Health Check Failures
+
+**Problem**: Services failing health checks or not starting properly
+
+**Solutions**:
+1. **Check Logs**:
+   ```bash
+   make logs
+   # or specific service
+   make logs-orchestrator
+   ```
+2. **Verify Dependencies**: Ensure PostgreSQL, Redis, and RabbitMQ are running:
+   ```bash
+   docker-compose ps
+   ```
+3. **Database Connection**: Check database connection and run migrations:
+   ```bash
+   make db-migrate
+   ```
+
+#### Port Conflicts
+
+**Problem**: Ports already in use
+
+**Solutions**:
+1. **Check Running Services**:
+   ```bash
+   netstat -tulpn | grep :3000
+   ```
+2. **Stop Conflicting Services**:
+   ```bash
+   docker-compose down
+   ```
+3. **Change Ports**: Modify port mappings in `docker-compose.yml`
+
+### Getting Help
+
+- **Check Logs**: Always start by checking service logs
+- **Verify Environment**: Ensure all prerequisites are installed
+- **Health Checks**: Use built-in health check endpoints
+- **Community**: Join our community forum for support
+- **Issues**: Report bugs on GitHub Issues
 
 ## 🔒 Security Features
 
@@ -374,18 +497,17 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## 📚 Documentation
 
-- **API Reference**: [https://docs.n8n-work.com/api](https://docs.n8n-work.com/api)
+- **API Reference**: Available via Swagger UI when running in development mode
 - **Architecture Guide**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - **Deployment Guide**: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 - **Development Guide**: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
-- **Troubleshooting**: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+- **Troubleshooting**: See troubleshooting section above
 
 ## 🔗 Links
 
-- **Website**: [https://n8n-work.com](https://n8n-work.com)
-- **Documentation**: [https://docs.n8n-work.com](https://docs.n8n-work.com)
-- **Community**: [https://community.n8n-work.com](https://community.n8n-work.com)
-- **Issues**: [https://github.com/n8n-work/platform/issues](https://github.com/n8n-work/platform/issues)
+- **Repository**: [https://github.com/jaydeep-work/n8n-ai](https://github.com/jaydeep-work/n8n-ai)
+- **Issues**: [https://github.com/jaydeep-work/n8n-ai/issues](https://github.com/jaydeep-work/n8n-ai/issues)
+- **Original N8N**: [https://n8n.io](https://n8n.io)
 
 ## 📄 License
 
@@ -394,12 +516,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - **N8N Team**: For the original inspiration and open-source foundation
-- **NestJS Team**: For the excellent framework
-- **Community Contributors**: For feedback, testing, and contributions
-- **Enterprise Users**: For real-world use cases and requirements
+- **NestJS Team**: For the excellent framework and architecture patterns
+- **Docker Team**: For containerization technology
+- **Open Source Community**: For the amazing tools and libraries that make this possible
 
 ---
 
-**Built with ❤️ for the automation community**
+**Built with ❤️ for workflow automation and AI integration**
 
-For questions, issues, or enterprise support, please contact us at [support@n8n-work.com](mailto:support@n8n-work.com).
+For questions or issues, please use GitHub Issues or contribute to the project.
