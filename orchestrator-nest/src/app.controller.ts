@@ -5,13 +5,13 @@ import { AppService } from './app.service';
 @ApiTags('app')
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(private readonly appService: AppService) { }
 
   @Get()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get application status' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Application is running',
     schema: {
       type: 'object',
@@ -46,8 +46,8 @@ export class AppController {
   @Get('ping')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Simple ping endpoint' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Pong response',
     schema: {
       type: 'object',
@@ -70,8 +70,8 @@ export class AppController {
   @Get('version')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get application version information' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Version information',
     schema: {
       type: 'object',

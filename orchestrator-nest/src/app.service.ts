@@ -4,7 +4,7 @@ import { version } from '../package.json';
 
 @Injectable()
 export class AppService {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) { }
 
   getStatus() {
     return {

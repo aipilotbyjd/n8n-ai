@@ -16,7 +16,7 @@ import { version } from '../package.json';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  
+
   try {
     // Create NestJS application
     const app = await NestFactory.create(AppModule, {
