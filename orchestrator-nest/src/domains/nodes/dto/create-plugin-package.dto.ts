@@ -43,6 +43,7 @@ export class CreatePluginPackageDto {
   @ApiProperty({
     description: "Plugin package manifest",
     type: "object",
+    additionalProperties: true,
     example: {
       nodes: ["CustomHttpRequest.node.js"],
       credentials: ["CustomHttpAuth.credentials.js"],
@@ -62,6 +63,7 @@ export class CreatePluginPackageDto {
   @ApiPropertyOptional({
     description: "Plugin configuration options",
     type: "object",
+    additionalProperties: true,
   })
   @IsOptional()
   @IsObject()

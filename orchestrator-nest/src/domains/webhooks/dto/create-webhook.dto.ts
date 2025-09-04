@@ -9,7 +9,7 @@ import {
   Max,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { WebhookMethod, AuthenticationType } from "../entities/webhook.entity";
+import { WebhookMethod, AuthType } from "../entities/webhook.entity";
 
 export class CreateWebhookDto {
   @ApiProperty({
@@ -45,12 +45,12 @@ export class CreateWebhookDto {
 
   @ApiPropertyOptional({
     description: "Authentication type for the webhook",
-    enum: AuthenticationType,
-    example: AuthenticationType.SIGNATURE,
+    enum: AuthType,
+    example: AuthType.SIGNATURE,
   })
   @IsOptional()
-  @IsEnum(AuthenticationType)
-  authenticationType?: AuthenticationType;
+  @IsEnum(AuthType)
+  authenticationType?: AuthType;
 
   @ApiPropertyOptional({
     description: "Authentication configuration data",

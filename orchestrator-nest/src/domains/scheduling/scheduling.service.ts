@@ -134,7 +134,7 @@ export class SchedulingService implements OnModuleInit, OnModuleDestroy {
     const schedule = this.scheduleRepository.create({
       ...createScheduleDto,
       tenantId,
-      nextRunAt,
+      nextRunAt: nextRunAt || new Date(),
       createdBy: userId,
       updatedBy: userId,
     });

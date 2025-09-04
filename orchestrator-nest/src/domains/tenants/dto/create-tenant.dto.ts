@@ -45,6 +45,7 @@ export class CreateTenantDto {
   @ApiPropertyOptional({
     description: "Tenant configuration settings",
     type: "object",
+    additionalProperties: true,
   })
   @IsOptional()
   @IsObject()

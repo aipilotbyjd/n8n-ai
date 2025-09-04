@@ -383,10 +383,10 @@ export class NodesController {
     @CurrentUser() user: any,
     @Tenant() tenantId: string,
   ): Promise<void> {
-    return this.nodesService.uninstallPluginPackage(
+    return this.nodesService.uninstallPlugin(
       packageId,
-      user.id,
       tenantId,
+      user.id,
     );
   }
 

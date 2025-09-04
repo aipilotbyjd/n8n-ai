@@ -82,6 +82,7 @@ export class CreatePolicyDto {
   @ApiPropertyOptional({
     description: "Additional conditions for policy evaluation",
     type: "object",
+    additionalProperties: true,
     example: {
       "metadata.department": { in: ["sales", "marketing"] },
       resourceId: { ne: "protected-resource" },
@@ -106,6 +107,7 @@ export class CreatePolicyDto {
   @ApiPropertyOptional({
     description: "Additional metadata",
     type: "object",
+    additionalProperties: true,
   })
   @IsOptional()
   @IsObject()
@@ -174,6 +176,7 @@ export class UpdatePolicyDto {
   @ApiPropertyOptional({
     description: "Policy conditions",
     type: "object",
+    additionalProperties: true,
   })
   @IsOptional()
   @IsObject()
@@ -193,6 +196,7 @@ export class UpdatePolicyDto {
   @ApiPropertyOptional({
     description: "Additional metadata",
     type: "object",
+    additionalProperties: true,
   })
   @IsOptional()
   @IsObject()
@@ -234,6 +238,7 @@ export class AssignPolicyDto {
   @ApiPropertyOptional({
     description: "Additional metadata",
     type: "object",
+    additionalProperties: true,
   })
   @IsOptional()
   @IsObject()
@@ -295,6 +300,7 @@ export class PolicyResponseDto {
   @ApiProperty({
     description: "Policy conditions",
     type: "object",
+    additionalProperties: true,
     example: {
       "metadata.department": { in: ["sales", "marketing"] },
     },
@@ -310,6 +316,7 @@ export class PolicyResponseDto {
   @ApiProperty({
     description: "Additional metadata",
     type: "object",
+    additionalProperties: true,
   })
   metadata?: any;
 
@@ -364,6 +371,7 @@ export class PolicyEvaluationRequestDto {
   @ApiPropertyOptional({
     description: "Additional context metadata",
     type: "object",
+    additionalProperties: true,
     example: { department: "sales", project: "Q1-campaign" },
   })
   @IsOptional()

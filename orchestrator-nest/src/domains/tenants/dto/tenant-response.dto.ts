@@ -58,6 +58,7 @@ export class TenantResponseDto {
   @ApiPropertyOptional({
     description: "Tenant settings",
     type: "object",
+    additionalProperties: true,
     example: {
       maxWorkflows: 1000,
       maxExecutionsPerDay: 10000,
@@ -89,6 +90,7 @@ export class TenantResponseDto {
   @ApiPropertyOptional({
     description: "Usage statistics",
     type: "object",
+    additionalProperties: true,
     example: {
       workflowCount: 150,
       executionCount: 5000,

@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { WebhookMethod, WebhookStatus } from "../entities/webhook.entity";
-import { AuthenticationType } from "@n8n-work/contracts";
+import { WebhookMethod, WebhookStatus, AuthType } from "../entities/webhook.entity";
 
 export class WebhookResponseDto {
   @ApiProperty({
@@ -56,10 +55,10 @@ export class WebhookResponseDto {
 
   @ApiProperty({
     description: "Authentication type",
-    enum: AuthenticationType,
-    example: AuthenticationType.SIGNATURE,
+    enum: AuthType,
+    example: AuthType.SIGNATURE,
   })
-  authenticationType: AuthenticationType;
+  authenticationType: AuthType;
 
   @ApiPropertyOptional({
     description: "Rate limit per minute",

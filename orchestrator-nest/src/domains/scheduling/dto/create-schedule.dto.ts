@@ -107,6 +107,7 @@ export class CreateScheduleDto {
   @ApiPropertyOptional({
     description: "Input data to pass to the workflow",
     type: "object",
+    additionalProperties: true,
   })
   @IsOptional()
   @IsObject()
@@ -115,6 +116,7 @@ export class CreateScheduleDto {
   @ApiPropertyOptional({
     description: "Additional configuration for the schedule",
     type: "object",
+    additionalProperties: true,
   })
   @IsOptional()
   @IsObject()

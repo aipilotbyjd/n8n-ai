@@ -212,4 +212,62 @@ export class PluginLoaderService {
       },
     };
   }
+
+  /**
+   * Install a plugin package
+   */
+  async installPlugin(
+    packageName: string,
+    version?: string,
+    tenantId?: string,
+    userId?: string,
+  ): Promise<PluginPackage> {
+    this.logger.log(`Installing plugin: ${packageName}@${version || 'latest'}`);
+    
+    try {
+      // This would typically:
+      // 1. Download package from registry
+      // 2. Validate package
+      // 3. Install dependencies
+      // 4. Load the package
+      
+      // For now, create a mock plugin package
+      const pluginPackage = new PluginPackage();
+      pluginPackage.name = packageName;
+      pluginPackage.version = version || '1.0.0';
+      pluginPackage.displayName = packageName;
+      pluginPackage.description = `Plugin package for ${packageName}`;
+      pluginPackage.author = 'Unknown';
+      pluginPackage.isOfficial = false;
+      
+      // Load the package
+      await this.loadPackage(pluginPackage);
+      
+      return pluginPackage;
+    } catch (error) {
+      this.logger.error(`Failed to install plugin ${packageName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Uninstall a plugin package
+   */
+  async uninstallPlugin(
+    packageId: string,
+    tenantId?: string,
+    userId?: string,
+  ): Promise<void> {
+    this.logger.log(`Uninstalling plugin: ${packageId}`);
+    
+    try {
+      // Unload the package
+      await this.unloadPackage(packageId);
+      
+      this.logger.log(`Successfully uninstalled plugin: ${packageId}`);
+    } catch (error) {
+      this.logger.error(`Failed to uninstall plugin ${packageId}:`, error);
+      throw error;
+    }
+  }
 }

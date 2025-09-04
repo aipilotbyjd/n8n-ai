@@ -82,6 +82,7 @@ export class Tenant {
   @ApiProperty({
     description: "Tenant configuration and settings",
     type: "object",
+    additionalProperties: true,
   })
   @Column({ type: "jsonb", default: {} })
   settings: Record<string, any>;
@@ -89,6 +90,7 @@ export class Tenant {
   @ApiProperty({
     description: "Tenant metadata and custom properties",
     type: "object",
+    additionalProperties: true,
   })
   @Column({ type: "jsonb", default: {} })
   metadata: Record<string, any>;

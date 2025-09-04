@@ -51,6 +51,7 @@ export class CreateNodeDto {
   @ApiProperty({
     description: "Node definition schema",
     type: "object",
+    additionalProperties: true,
     example: {
       inputs: ["main"],
       outputs: ["main"],

@@ -19,7 +19,7 @@ import { CreateWorkflowDto } from "./dto/create-workflow.dto";
 import { UpdateWorkflowDto } from "./dto/update-workflow.dto";
 import { ListWorkflowsDto } from "./dto/list-workflows.dto";
 import { WorkflowValidationService } from "./workflow-validation.service";
-import { AuthUser } from "@n8n-work/contracts";
+import { AuthUser } from "../auth/interfaces/auth-user.interface";
 import { TenantService } from "../tenants/tenants.service";
 import { PaginatedResult } from "../common/interfaces/paginated-result.interface";
 import { WorkflowCompilerService } from "./workflow-compiler.service";
@@ -42,7 +42,7 @@ export class WorkflowsService {
     private readonly metricsService: MetricsService,
     private readonly auditLogService: AuditLogService,
     private readonly executionsService: ExecutionsService,
-  ) {}
+  ) { }
 
   async create(
     createWorkflowDto: CreateWorkflowDto,
@@ -549,8 +549,8 @@ export class WorkflowsService {
       successRate:
         stats.total_executions > 0
           ? Math.round(
-              (stats.total_successes / stats.total_executions) * 100 * 100,
-            ) / 100
+            (stats.total_successes / stats.total_executions) * 100 * 100,
+          ) / 100
           : 0,
     };
 
@@ -632,7 +632,7 @@ export class WorkflowsService {
       successCount: 0,
       failureCount: 0,
       avgExecutionTimeMs: 0,
-      lastExecutionAt: null,
+      lastExecutionAt: undefined,
     });
 
     const savedWorkflow = await this.workflowRepository.save(duplicatedWorkflow);

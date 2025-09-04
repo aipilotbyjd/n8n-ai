@@ -29,7 +29,7 @@ import { CreateWorkflowDto } from "./dto/create-workflow.dto";
 import { UpdateWorkflowDto } from "./dto/update-workflow.dto";
 import { ListWorkflowsDto } from "./dto/list-workflows.dto";
 import { Workflow } from "./entities/workflow.entity";
-import { AuthUser } from "@n8n-work/contracts";
+import { AuthUser } from "../auth/interfaces/auth-user.interface";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ThrottlerModule } from "@nestjs/throttler";
 import { JwtModule } from "@nestjs/jwt";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { WorkflowWebSocketGateway } from "./workflow-websocket.gateway";
 import { WebSocketService } from "./websocket.service";
 import { WebSocketAuthGuard } from "./guards/websocket-auth.guard";

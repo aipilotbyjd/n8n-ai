@@ -482,4 +482,20 @@ export class NodesService {
       updatedAt: node.updatedAt,
     };
   }
+
+  /**
+   * Get available packages from registry
+   */
+  async getAvailablePackages(search?: string, category?: string): Promise<NodeResponseDto[]> {
+    // This would typically call an external registry API
+    // For now, return installed packages that match the criteria
+    const filters: any = {};
+    if (search) {
+      filters.keywords = search;
+    }
+    if (category) {
+      filters.category = category;
+    }
+    return this.findAllNodes(filters);
+  }
 }

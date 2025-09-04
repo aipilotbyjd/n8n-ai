@@ -91,6 +91,24 @@ export class NodeResponseDto {
   })
   usageCount: number;
 
+  @ApiPropertyOptional({
+    description: "Download count from registry",
+    example: 1250,
+  })
+  downloadCount?: number;
+
+  @ApiPropertyOptional({
+    description: "Average rating (0-5)",
+    example: 4.2,
+  })
+  rating?: number;
+
+  @ApiPropertyOptional({
+    description: "Number of ratings",
+    example: 28,
+  })
+  ratingCount?: number;
+
   @ApiProperty({
     description: "When node was created",
     example: "2024-01-15T10:30:00Z",
@@ -112,6 +130,7 @@ export class NodeResponseDto {
   @ApiPropertyOptional({
     description: "Node definition (included when requested)",
     type: "object",
+    additionalProperties: true,
   })
   definition?: any;
 
@@ -126,12 +145,18 @@ export class NodeResponseDto {
     properties: {
       id: { type: "string" },
       name: { type: "string" },
+      displayName: { type: "string" },
       version: { type: "string" },
+      author: { type: "string" },
+      isOfficial: { type: "boolean" },
     },
   })
   pluginPackage?: {
     id: string;
     name: string;
+    displayName: string;
     version: string;
+    author: string;
+    isOfficial: boolean;
   };
 }
